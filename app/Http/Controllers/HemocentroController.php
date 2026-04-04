@@ -11,7 +11,7 @@ class HemocentroController extends Controller
     {
         $validated = $request->validate([
             'nome'               => 'required|string|max:255',
-            'telefone'           => 'required|string|max:20',
+            'telefone'           => ['required', 'string', 'regex:/^\(\d{2}\) \d{4,5}-\d{4}$/'],
             'email'              => 'required|email|max:255|unique:hemocentro,email',
             'bairro'             => 'required|string|max:255',
             'uf'                 => 'required|string|max:2',
@@ -25,15 +25,44 @@ class HemocentroController extends Controller
             'status'             => 'required|integer|in:0,1', // Garante que seja apenas 0 ou 1 (tinyint)
             'criado_por'         => 'nullable|string|max:255' // Pode ser preenchido pela API ou opcional
         ]);
-
+    $validated['criado_por'] = $request->input('criado_por','usuario_teste_12');
         $hemocentro = Hemocentro::create($validated);
 
-        return response()->json([
-            'message' => 'Hemocentro criado com sucesso!',
-            'data' => $hemocentro
-        ], 201);
-    }
+        return response()->json([ 'message' => 'Hemocentro criado com sucesso!', 'data' => $hemocentro], 201);
     
+     }
+
+     public function show($id){
+        $hemocentro = Hemocentro::findOrFail($id);
+
+        return response ()->json($hemocentro,200);
+    }
+        //METODO  PUT  - ATUALIZAR
+     public function update(Request $request, $id)
+
+        {
+            $hemocentro =hemocentro:: findOrFail($id);
+
+            $hemocentro->update($request->all());
+
+            return response()->json(['message' => 'Hemocentro atualizado com sucesso!','data' => $hemocentro ], 200 );
+        }
+
+        //METODO DELETE - DELETAR
+    public function destroy($id)
+    {
+        $hemocentro = Hemocentro::findOrFail($id);
+
+        $hemocentro->status_agendamento = 'inativo';
+        $hemocentro->status=0;
+
+        $hemocentro->save();
+        $hemocentro->delete();
+         // Como ativamos o SoftDeletes no Model, isso NÃO dá um DROP na linha.
+         // Ele apenas preenche a coluna 'deletado_em' com a data/hora atual. 
+
+        return response()->json(['message' => 'Hemocentro deletado com sucesso!'], 200);
+    }
     // Aproveitando, aqui está o método para listar todos, que o Front-end vai precisar:
     public function index()
     {

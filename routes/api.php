@@ -18,6 +18,10 @@ Route::prefix('auth')->group(function () {
     
 
 });
+//ROTAS PARA OS HEMOCENTROS
+        Route::get   ('/hemocentros',         [HemocentroController::class, 'index']);
+        Route::get   ('/hemocentros/{id}',    [HemocentroController::class, 'show']);
+        Route::post  ('/hemocentros',         [HemocentroController::class, 'store']);
+        Route::put   ('/hemocentros/{id}',    [HemocentroController::class, 'update']);
+        Route::delete('/hemocentros/{id}',    [HemocentroController::class, 'destroy']);
 
-Route::get('/hemocentros', [HemocentroController::class, 'index']);
-        Route::post('/hemocentros', [HemocentroController::class, 'store']);
