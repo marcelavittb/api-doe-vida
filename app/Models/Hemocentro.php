@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Hemocentro extends Model
 { 
-    protected $table = 'hemocentro';
+    protected $table = 'hemocentros';
 
     use SoftDeletes;
     

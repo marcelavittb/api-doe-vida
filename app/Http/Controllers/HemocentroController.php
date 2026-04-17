@@ -12,7 +12,7 @@ class HemocentroController extends Controller
         $validated = $request->validate([
             'nome'               => 'required|string|max:255',
             'telefone'           => ['required', 'string', 'regex:/^\(\d{2}\) \d{4,5}-\d{4}$/'],
-            'email'              => 'required|email|max:255|unique:hemocentro,email',
+            'email'              => 'required|email|max:255|unique:hemocentros,email',
             'bairro'             => 'required|string|max:255',
             'uf'                 => 'required|string|max:2',
             'endereco'           => 'required|string|max:255',
@@ -20,7 +20,7 @@ class HemocentroController extends Controller
             'numero'             => 'required|integer',
             'complemento'        => 'nullable|string|max:255', // Nullable pois nem todo endereço tem
             'razao_social'       => 'required|string|max:255',
-            'cnpj'               => 'required|string|max:20|unique:hemocentro,cnpj', // Adicionado unique para não repetir CNPJ
+            'cnpj'               => 'required|string|max:20|unique:hemocentros,cnpj', // Adicionado unique para não repetir CNPJ
             'status_agendamento' => 'required|in:ativo,inativo',
             'status'             => 'required|integer|in:0,1', // Garante que seja apenas 0 ou 1 (tinyint)
             'criado_por'         => 'nullable|string|max:255' // Pode ser preenchido pela API ou opcional
@@ -41,7 +41,7 @@ class HemocentroController extends Controller
      public function update(Request $request, $id)
 
         {
-            $hemocentro =hemocentro:: findOrFail($id);
+            $hemocentro = Hemocentro::findOrFail($id);
 
             $hemocentro->update($request->all());
 
@@ -66,8 +66,9 @@ class HemocentroController extends Controller
     // Aproveitando, aqui está o método para listar todos, que o Front-end vai precisar:
     public function index()
     {
-        $hemocentros = Hemocentro::all();
-        return response()->json($hemocentros, 200);
+        $hemocentro = Hemocentro::all();
+        return response()->json($hemocentro, 200);
     }
+    
 }
 

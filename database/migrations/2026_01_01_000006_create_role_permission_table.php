@@ -12,13 +12,16 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('role_permission', function (Blueprint $table) {
-            $table->increments('id');            
-            $table->unsignedInteger('id_permission')->nullable();
-            $table->unsignedInteger('id_role')->nullable();
+    $table->id();
 
-            $table->foreign('id_permission')->references('id')->on('permissions');
-            $table->foreign('id_role')->references('id')->on('roles');
-        });
+    $table->foreignId('role_id')
+          ->constrained('roles')
+          ->cascadeOnDelete();
+
+    $table->foreignId('permission_id')
+          ->constrained('permissions')
+          ->cascadeOnDelete();
+    });
     }
     
 

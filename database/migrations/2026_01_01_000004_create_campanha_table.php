@@ -12,8 +12,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('campanha', function (Blueprint $table) {
-            $table->increments('id');
-            $table->unsignedInteger('hemocentro_id')->nullable();
+            $table->id();
+            $table->unsignedBigInteger('hemocentro_id')->nullable();
             $table->string('titulo', 255)->nullable();
             $table->string('subtitulo', 255)->nullable();
             $table->string('descricao', 255)->nullable();
@@ -30,7 +30,7 @@ return new class extends Migration
 
             $table->foreign('hemocentro_id')
             ->references('id')
-            ->on('hemocentro')
+            ->on('hemocentros')
             ->nullOnDelete();       
              });
     }

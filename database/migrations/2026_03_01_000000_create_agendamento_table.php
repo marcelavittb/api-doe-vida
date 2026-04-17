@@ -9,32 +9,27 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('agendamento', function (Blueprint $table) {
-            $table->increments('id'); 
+            // 1. Usar o padrão moderno (BigIncrements) para bater com a tabela Users
+            $table->id(); 
+
+            // 2. Definir as colunas com foreignId (já cria como UnsignedBigInteger)
+            $table->foreignId('user_id')->nullable()->constrained('users')->onDelete('cascade');
             
-            
-            $table->unsignedInteger('user_id')->nullable(); 
-            $table->unsignedInteger('hemocentro_id')->nullable();
+            // A coluna do Membro 3 (Funcionário)
+            $table->foreignId('coletador_id')->nullable()->constrained('users')->onDelete('set null');
+
+            // Cuidado aqui: sua tabela de hemocentro está no singular ou plural? 
+            // Se for 'hemocentros', mude aqui embaixo:
+            $table->foreignId('hemocentro_id')->nullable()->constrained('hemocentros')->onDelete('cascade');
             
             $table->dateTime('data_hora_doacao')->nullable();
-            $table->enum('status_agendamento', ['agendado', 'cancelado', 'concluido'])->default('agendado');
-
+            $table->enum('status_agendamento', ['AGE', 'CAN', 'CON', 'EXC'])->default('AGE');
+            
             $table->timestamp('criado_em')->useCurrent();
             $table->timestamp('atualizado_em')->useCurrent()->useCurrentOnUpdate();
-
-            $table->softDeletes()->renameColumn('deleted_at', 'deletado_em');
-        });
-
-        Schema::table('agendamento', function (Blueprint $table) {
-            $table->renameColumn('deleted_at', 'deletado_em');
-
-            $table->foreign('user_id')
-                  ->references('id')->on('users')
-                  ->onDelete('cascade'); 
-                
-
-            $table->foreign('hemocentro_id')
-                  ->references('id')->on('hemocentro')
-                  ->onDelete('cascade');
+            
+            // Forma correta de renomear o softDeletes
+            $table->softDeletes('deletado_em');
         });
     }
 

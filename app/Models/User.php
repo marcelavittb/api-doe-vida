@@ -32,6 +32,8 @@ class User extends Authenticatable
     'hemocentro_id', 
     'responsavel_nome',
     'responsavel_cpf',
+    'responsavel_telefone',
+    'tempo_restricao',
     'criado_por'
 ];
 
@@ -47,7 +49,9 @@ const UPDATED_AT = 'atualizado_em';
     {
         return [
             'email_verified_at' => 'datetime',
-            'password' => 'hashed',
+            'password'        => 'hashed',
+            'data_nasc'       => 'date',
+            'tempo_restricao' => 'date',
         ];
     }
     

@@ -8,48 +8,42 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // 1. Criação da tabela
-       Schema::create('users', function (Blueprint $table) {
-    $table->increments('id'); // ✅ corrigido
+        Schema::create('users', function (Blueprint $table) {
+            $table->id(); // ✅ padrão correto (BIGINT)
 
-    $table->string('name'); 
-    $table->string('email')->unique();
-    $table->string('password');
-    $table->rememberToken();
+            $table->string('name'); 
+            $table->string('email')->unique();
+            $table->string('password');
+            $table->rememberToken();
 
-    $table->enum('tipo_sang', ['A+','A-','B+','B-','AB+','AB-','O+','O-'])->nullable();
-    $table->enum('sexo', ['M','F','Outro'])->nullable();
-    $table->date('data_nasc')->nullable();
-    $table->string('cpf', 14)->unique()->nullable();
-    $table->string('telefone', 20)->nullable();
+            $table->enum('tipo_sang', ['A+','A-','B+','B-','AB+','AB-','O+','O-'])->nullable();
+            $table->enum('sexo', ['M','F','Outro'])->nullable();
+            $table->date('data_nasc')->nullable();
+            $table->string('cpf', 14)->unique()->nullable();
+            $table->string('telefone', 20)->nullable();
 
-    $table->string('cep', 9)->nullable();
-    $table->string('rua')->nullable();
-    $table->string('bairro')->nullable();
-    $table->string('cidade')->nullable();
-    $table->string('complemento')->nullable();
-    $table->integer('numero')->nullable();
-    $table->char('uf', 2)->nullable();
+            $table->string('cep', 9)->nullable();
+            $table->string('rua')->nullable();
+            $table->string('bairro')->nullable();
+            $table->string('cidade')->nullable();
+            $table->string('complemento')->nullable();
+            $table->integer('numero')->nullable();
+            $table->char('uf', 2)->nullable();
 
-    $table->boolean('status')->default(true);
+            $table->boolean('status')->default(true);
 
-    // ✅ corrigidos
-    $table->unsignedInteger('role_id')->nullable();
-    $table->unsignedInteger('hemocentro_id')->nullable();
-    $table->unsignedInteger('criado_por')->nullable();
+            // ✅ agora compatível com BIGINT
+            $table->foreignId('role_id')->nullable()->constrained('roles')->nullOnDelete();
+            $table->foreignId('hemocentro_id')->nullable()->constrained('hemocentros')->nullOnDelete();
 
-    $table->timestamp('criado_em')->useCurrent();
-    $table->timestamp('atualizado_em')->useCurrent()->useCurrentOnUpdate();
-    $table->softDeletes();
-});
+            // ⚠️ SEM FK por enquanto (auto relacionamento)
+            $table->foreignId('criado_por')->nullable();
 
-    Schema::table('users', function (Blueprint $table) {
-    $table->renameColumn('deleted_at', 'deletado_em');
+            $table->timestamp('criado_em')->useCurrent();
+            $table->timestamp('atualizado_em')->useCurrent()->useCurrentOnUpdate();
 
-    $table->foreign('role_id')->references('id')->on('roles')->nullOnDelete();
-    $table->foreign('hemocentro_id')->references('id')->on('hemocentro')->nullOnDelete();
-    $table->foreign('criado_por')->references('id')->on('users')->nullOnDelete();
-});
+            $table->softDeletes('deletado_em'); // ✅ já cria com nome correto
+        });
     }
 
     public function down(): void

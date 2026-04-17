@@ -12,29 +12,31 @@ return new class extends Migration
    public function up(): void
     {
         Schema::create('doacao', function (Blueprint $table) {
-            $table->integer('id');
- 
-            $table->unsignedInteger('id_user')->nullable();
-            $table->unsignedInteger('hemocentro_id')->nullable();
-            $table->unsignedInteger('id_user_func')->nullable();
-            $table->unsignedInteger('retirado_por')->nullable();
+    $table->id(); // ✅ correto
 
-            $table->dateTime('data_hora_doacao')->nullable();
-            $table->dateTime('data_validade_sangue')->nullable();
-            $table->dateTime('retirada_em')->nullable();
-            
-            $table->enum('tipo_sangue', ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'])->nullable();
-            $table->float('quantidade')->nullable();
-            $table->float('quantidade_retirada')->nullable();
-            $table->dateTime('atualizado_em')->nullable();
-            
-            $table->timestamps();
+    $table->foreignId('user_id')->nullable()
+          ->constrained('users');
 
-            $table->foreign('id_user', 'doacao_ibfk_1')->references('id')->on('users');
-            $table->foreign('hemocentro_id', 'doacao_ibfk_2')->references('id')->on('hemocentro');
-            $table->foreign('id_user_func', 'doacao_ibfk_3')->references('id')->on('users');
-            $table->foreign('retirado_por', 'doacao_ibfk_4')->references('id')->on('users');
-        });
+    $table->foreignId('hemocentro_id')->nullable()
+          ->constrained('hemocentros');
+
+    $table->foreignId('funcionario_id')->nullable()
+          ->constrained('users');
+
+    $table->foreignId('retirado_por')->nullable()
+          ->constrained('users');
+
+    $table->dateTime('data_hora_doacao')->nullable();
+    $table->dateTime('data_validade_sangue')->nullable();
+    $table->dateTime('retirada_em')->nullable();
+    
+    $table->enum('tipo_sangue', ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'])->nullable();
+    $table->float('quantidade')->nullable();
+    $table->float('quantidade_retirada')->nullable();
+    $table->dateTime('atualizado_em')->nullable();
+
+    $table->timestamps();
+});
     }
 
     /**
