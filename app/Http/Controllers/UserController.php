@@ -16,9 +16,9 @@ class UserController extends Controller
             'email'         => 'required|email|unique:users,email',
             'password'      => 'required|min:6',
             'cpf'           => 'required|string|size:11|unique:users,cpf',
-            'role_id'       => 'required|exists:roles,id',
+            'role'          => 'required|string|exists:roles,name',
             'hemocentro_id' => [
-                Rule::requiredIf(fn() => in_array($request->role_id, [2, 3])),
+                Rule::requiredIf(fn() => in_array($request->role, ['funcionario', 'diretor'])),
                 'nullable',
                 'exists:hemocentros,id'
             ],
@@ -33,8 +33,8 @@ class UserController extends Controller
             return response()->json(['error' => 'CPF inválido'], 422);
         }
 
-        // Se for doador (role_id 1), força hemocentro como null
-        if ($validated['role_id'] == 1) {
+        // Se for doador, não pode ter hemocentro
+        if ($validated['role'] === 'doador') {
             $validated['hemocentro_id'] = null;
         }
 
@@ -43,15 +43,17 @@ class UserController extends Controller
             'email'         => $validated['email'],
             'password'      => Hash::make($validated['password']),
             'cpf'           => $validated['cpf'],
-            'role_id'       => $validated['role_id'],
             'hemocentro_id' => $validated['hemocentro_id'],
             'telefone'      => $validated['telefone'] ?? null,
             'tipo_sang'     => $validated['tipo_sang'] ?? null,
             'sexo'          => $validated['sexo'] ?? null,
             'data_nasc'     => $validated['data_nasc'] ?? null,
             'status'        => true,
-            'criado_por'    => auth()->id(),
+            'criado_por'    => auth()->user()->id
         ]);
+
+        // 🔥 SPATIE
+        $user->assignRole($validated['role']);
 
         return response()->json($user, 201);
     }
@@ -95,13 +97,10 @@ class UserController extends Controller
             'email'         => 'sometimes|email|unique:users,email,' . $id,
             'password'      => 'sometimes|min:6',
             'cpf'           => 'sometimes|string|size:11|unique:users,cpf,' . $id,
-            'role_id'       => 'sometimes|exists:roles,id',
+            'role'          => 'sometimes|string|exists:roles,name',
             'hemocentro_id' => [
+                Rule::requiredIf(fn() => in_array($request->role, ['funcionario', 'diretor'])),
                 'nullable',
-                Rule::requiredIf(function () use ($request, $user) {
-                    $roleId = $request->role_id ?? $user->role_id;
-                    return in_array($roleId, [2, 3]);
-                }),
                 'exists:hemocentros,id'
             ],
             'status'        => 'sometimes|boolean',
@@ -114,13 +113,19 @@ class UserController extends Controller
             $validated['password'] = Hash::make($validated['password']);
         }
 
-        // Se o cargo atual ou novo for doador (1), limpa o hemocentro
-        $finalRoleId = $validated['role_id'] ?? $user->role_id;
-        if ($finalRoleId == 1) {
+        // Se for doador, remove hemocentro
+        $finalRole = $validated['role'] ?? $user->getRoleNames()->first();
+
+        if ($finalRole === 'doador') {
             $validated['hemocentro_id'] = null;
         }
 
         $user->update($validated);
+
+        // 🔥 SPATIE
+        if (isset($validated['role'])) {
+            $user->syncRoles([$validated['role']]);
+        }
 
         return response()->json([
             'message' => 'Usuário atualizado com sucesso!',
