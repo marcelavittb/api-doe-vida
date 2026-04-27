@@ -2,54 +2,40 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use App\Models\User;
-use Illuminate\Hash\Bcrypt;
 use Illuminate\Support\Facades\Hash;
 
 class UserSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     */
     public function run(): void
     {
+        // Criando um Doador para testes
         User::create([
-            'name'=>'Doador Apto',
-            'email'=>'doadorapto@gmail.com',
-            'password'=>bcrypt('123456'),
+            'name' => 'Dr. Anderson Funcionário',
+            'email' => 'funcionario2@email.com',
+            'password' => Hash::make('password'),
+            'tipo_sang'=> 'B-',
+            'telefone'=>'(11) 98765-4321',
+            'data_nasc'=> '1999-06-15',
             'role_id'=>1,
-            'status'=>1,
-            'data_nasc'=>'1990-01-01',
-            'cpf'=>'12345678900',
-            'tempo_restricao'=>null
+            'hemocentro_id'=> 1,
+            // Adicione aqui outros campos que você tenha na sua migration de users
         ]);
 
+        // Criando um Funcionário para testes
         User::create([
-            'name'=>'Doador Restrito',
-            'email'=>'doadorrestrito@gmail.com',
-            'password'=>bcrypt('123456'),
+            'name' => 'Dr. Anderson Funcionário',
+            'email' => 'funcionario@email.com',
+            'password' => Hash::make('password'),
+            'tipo_sang'=> 'A+',
+            'telefone'=>'(11) 98765-4321',
+            'data_nasc'=> '1999-05-15',
             'role_id'=>1,
-            'status'=>1,
-            'data_nasc'=>'2000-11-09',
-            'cpf'=>'12345678901',
-            'tempo_restricao'=>now()->addDays(90)
-        ]);
+            'hemocentro_id'=> 1,
 
-        User::create([
-            'name'=>'Doador menor',
-            'email'=>'doadormenor@gmail.com',
-            'password'=>bcrypt('123456'),
-            'sexo'=>'M',
-            'role_id'=>1,
-            'status'=>1,
-            'data_nasc'=>'2015-05-15',
-            'cpf'=>'12345678902',
-            'tempo_restricao'=>null,
-            'responsavel_nome'=>'Responsável do Doador Menor',
-            'responsavel_cpf'=>'12345678903',
-            'responsavel_telefone'=>'(11) 98765-4321'
         ]);
+        
+        $this->command->info('Usuários (Doador e Funcionário) criados com sucesso!');
     }
 }

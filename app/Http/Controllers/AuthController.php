@@ -6,8 +6,10 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use App\Models\User;
-use Illuminate\Database\QueryException;
 use Carbon\Carbon;
+
+
+
 
 class AuthController extends Controller
 {
@@ -18,7 +20,7 @@ class AuthController extends Controller
             'email'     => 'required|email|unique:users,email',
             'password'  => 'required|min:6|confirmed',
             'cpf'       => 'required|string|size:11|unique:users,cpf',
-            'telefone'  => 'nullable|string|max:20|regex:/^\(\d{2}\)\s9\d{4}-\d{4}$/',
+            'telefone' => 'required|string',
             'tipo_sang' => 'nullable|in:A+,A-,B+,B-,AB+,AB-,O+,O-',
             'sexo'      => 'required|in:M,F,Outro,Prefiro não informar',
             'data_nasc' => 'required|date_format:d/m/Y',
@@ -28,39 +30,21 @@ class AuthController extends Controller
             'bairro'    => 'nullable|string|max:255',
             'cidade'    => 'required|string|max:255',
             'uf'        => 'nullable|in:AC,AL,AP,AM,BA,CE,DF,ES,GO,MA,MT,MS,MG,PA,PB,PR,PE,PI,RJ,RN,RS,RO,RR,SC,SP,SE,TO',
-            'hemocentro_id' => [
-                    'required',
-                    'exists:hemocentros,id',
-                    function ($attribute, $value, $fail) {
-                         // Checa se o hemocentro existe e se está ATIVO (status = 1)
-                     $hemocentro = \App\Models\Hemocentro::find($value);
-
-                    if (!$hemocentro || $hemocentro->status != 1) {
-                    $fail('Este hemocentro está inativo, selecione outro.');
-                    }
-                    },
-            ],
 
             'responsavel_nome' => 'nullable|string|max:255',
             'responsavel_cpf'  => 'nullable|string|size:11',
             'responsavel_data_nasc' => 'nullable|date_format:d/m/Y',
         ]);
-
+$validated['telefone'] = preg_replace('/\D/', '', $validated['telefone']);
         try {
-            // ✅ DATA + IDADE
             $dataNasc = Carbon::createFromFormat('d/m/Y', $validated['data_nasc']);
             $idade = $dataNasc->age;
 
-            // ✅ VALIDAR CPF USUÁRIO
             if (!$this->validarCPF($validated['cpf'])) {
-                return response()->json([
-                    'error' => 'CPF inválido.'
-                ], 422);
+                return response()->json(['error' => 'CPF inválido.'], 422);
             }
 
-            // ✅ REGRA: menor de 18 precisa de responsável
             if ($idade < 18) {
-
                 if (
                     empty($validated['responsavel_nome']) ||
                     empty($validated['responsavel_cpf']) ||
@@ -71,14 +55,12 @@ class AuthController extends Controller
                     ], 422);
                 }
 
-                // CPF responsável
                 if (!$this->validarCPF($validated['responsavel_cpf'])) {
                     return response()->json([
                         'error' => 'CPF do responsável inválido.'
                     ], 422);
                 }
 
-                // idade responsável
                 $dataResp = Carbon::createFromFormat('d/m/Y', $validated['responsavel_data_nasc']);
 
                 if ($dataResp->age < 18) {
@@ -88,7 +70,7 @@ class AuthController extends Controller
                 }
             }
 
-            // ✅ CRIAR USUÁRIO
+            // ✅ CRIA USUÁRIO
             $user = User::create([
                 'name'      => $validated['name'],
                 'email'     => $validated['email'],
@@ -104,17 +86,18 @@ class AuthController extends Controller
                 'bairro'    => $validated['bairro'] ?? null,
                 'cidade'    => $validated['cidade'],
                 'uf'        => $validated['uf'] ?? null,
-                'hemocentro_id' => $validated['hemocentro_id'],
-                'role_id'   => 1,
+                'hemocentro_id' => null,
                 'status'    => true,
 
-                // responsável
                 'responsavel_nome' => $validated['responsavel_nome'] ?? null,
                 'responsavel_cpf'  => $validated['responsavel_cpf'] ?? null,
                 'responsavel_data_nasc' => !empty($validated['responsavel_data_nasc'])
                     ? Carbon::createFromFormat('d/m/Y', $validated['responsavel_data_nasc'])->format('Y-m-d')
                     : null,
             ]);
+
+            // 🔥 SPATIE
+            $user->assignRole('doador');
 
             return response()->json([
                 'message' => 'Doador registrado com sucesso!',
@@ -124,12 +107,11 @@ class AuthController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'error' => 'Erro ao cadastrar usuário',
-                'details' => $e->getMessage() // 👈 agora você vê o erro real
+                'details' => $e->getMessage()
             ], 500);
         }
     }
 
-    // ✅ VALIDADOR CPF
     private function validarCPF($cpf)
     {
         $cpf = preg_replace('/[^0-9]/', '', $cpf);
@@ -144,15 +126,12 @@ class AuthController extends Controller
             }
             $d = ((10 * $d) % 11) % 10;
 
-            if ($cpf[$c] != $d) {
-                return false;
-            }
+            if ($cpf[$c] != $d) return false;
         }
 
         return true;
     }
 
-    // ✅ LOGIN (já pronto)
     public function login(Request $request)
     {
         $credentials = $request->validate([
@@ -174,7 +153,7 @@ class AuthController extends Controller
             'success' => true,
             'message' => 'Login realizado com sucesso!',
             'user'    => $user,
-            'role_id' => $user->role_id,
+            'roles'   => $user->getRoleNames(),
             'token'   => $token,
             'token_type' => 'Bearer',
         ]);

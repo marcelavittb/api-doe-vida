@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('campanha', function (Blueprint $table) {
+        Schema::create('campanhas', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('hemocentro_id')->nullable();
             $table->string('titulo', 255)->nullable();
@@ -23,11 +23,10 @@ return new class extends Migration
             $table->dateTime('data_expiracao')->nullable();
             $table->enum('tipo_sangue', ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'])->nullable();
             $table->boolean('status')->nullable();
-            $table->dateTime('criacao_em')->nullable();
-            $table->dateTime('atualizado_em')->nullable();
-            $table->dateTime('deletado_em')->nullable();
-            $table->timestamps();
-
+            $table->timestamp('criado_em')->nullable();
+            $table->timestamp('atualizado_em')->nullable();
+            $table->softDeletes('deletado_em');
+            
             $table->foreign('hemocentro_id')
             ->references('id')
             ->on('hemocentros')
@@ -40,6 +39,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('campanha');
+        Schema::dropIfExists('campanhas');
     }
 };
