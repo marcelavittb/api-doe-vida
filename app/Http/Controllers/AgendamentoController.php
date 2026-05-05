@@ -10,30 +10,69 @@ use Illuminate\Support\Facades\Auth;
 
 class AgendamentoController extends Controller
 {
+    /**
+     * Lista agendamentos.
+     * Doador: vê seus agendamentos ativos e concluídos.
+     * Funcionário: vê agendamentos do seu hemocentro.
+     */
+    public function index(Request $request)
+    {
+        $user = Auth::user();
+        $query = Agendamento::with(['hemocentro', 'doador', 'triagem', 'doacao']);
+
+        if ($user->role_id == 1) { // Doador
+            $query->where('user_id', $user->id)
+                  ->whereIn('status_agendamento', ['AGE', 'CON']);
+        } elseif ($user->hemocentro_id) { // Funcionário vinculado
+            $query->where('hemocentro_id', $user->hemocentro_id);
+        }
+
+        $agendamentos = $query->orderBy('data_hora_doacao', 'desc')->get();
+
+        return response()->json([
+            'status' => 'sucesso',
+            'data'   => $agendamentos
+        ]);
+    }
+
+    /**
+     * Histórico completo do doador.
+     */
+    public function historico()
+    {
+        $user = Auth::user();
+        $agendamentos = Agendamento::with(['hemocentro', 'triagem', 'doacao'])
+            ->where('user_id', $user->id)
+            ->orderBy('data_hora_doacao', 'desc')
+            ->get();
+
+        return response()->json([
+            'status' => 'sucesso',
+            'data'   => $agendamentos
+        ]);
+    }
+
     public function store(Request $request)
     {
         $user = Auth::user();
 
         $request->validate([
-        'hemocentro_id' => [
-            'required',
-            'exists:hemocentros,id',
-            function ($attribute, $value, $fail) {
-                // Checa se o hemocentro está ativo no banco
-                $ativo = \App\Models\Hemocentro::where('id', $value)
-                    ->where('status_agendamento', 'ativo')
-                    ->exists();
+            'hemocentro_id' => [
+                'required',
+                'exists:hemocentros,id',
+                function ($attribute, $value, $fail) {
+                    $ativo = \App\Models\Hemocentro::where('id', $value)
+                        ->where('status_agendamento', 'ativo')
+                        ->exists();
 
-                if (!$ativo) {
-                    $fail('Este hemocentro não está aceitando agendamentos no momento.');
-                }
-            },
-        ],
-        'data_hora_doacao' => 'required|date|after:now',
+                    if (!$ativo) {
+                        $fail('Este hemocentro não está aceitando agendamentos no momento.');
+                    }
+                },
+            ],
+            'data_hora_doacao' => 'required|date|after:now',
         ]);
-    
 
-         //Validação de Restrição Biológica (90/120 dias)
         if ($user->tempo_restricao && Carbon::parse($user->tempo_restricao)->isFuture()) {
             return response()->json([
                 'status'   => 'erro',
@@ -42,16 +81,13 @@ class AgendamentoController extends Controller
             ], 403);
         }
 
-        // 2. Lógica de Reagendamento: Inativa agendamentos futuros antigos
         Agendamento::where('user_id', $user->id)
             ->where('status_agendamento', 'AGE')
             ->update(['status_agendamento' => 'EXC']);
 
-        // 3. Cálculo de Idade para Alerta de Responsável
         $idade = Carbon::parse($user->data_nasc)->age;
         $precisaAutorizacao = ($idade >= 16 && $idade < 18);
 
-        // 4. Criação do Novo Agendamento
         $agendamento = Agendamento::create([
             'user_id'            => $user->id,
             'hemocentro_id'      => $request->hemocentro_id,
@@ -65,50 +101,69 @@ class AgendamentoController extends Controller
             'data'    => $agendamento
         ], 201);
     }
-    
 
-    public function index()
-{
-    $user = Auth::user();
-
-    // 1. Buscamos os agendamentos garantindo que o user_id seja do logado
-    // 2. Usamos o with('hemocentro') - CERTIFIQUE-SE que no Model está no SINGULAR
-    $agendamentos = \App\Models\Agendamento::with('hemocentro')
-        ->where('user_id', $user->id)
-        ->whereIn('status_agendamento', ['AGE', 'CON']) // Traz apenas Ativos ou Concluídos
-        ->orderBy('data_hora_doacao', 'desc')
-        ->get();
-
-    // Se a coleção estiver vazia, avisamos
-    if ($agendamentos->isEmpty()) {
-        return response()->json([
-            'message' => 'Você ainda não possui agendamentos marcados.',
-            'data' => []
-        ], 200);
-    }
-
-    // Se chegou aqui, ele TEM que listar no campo 'data'
-    return response()->json([
-        'message' => 'Agendamentos recuperados com sucesso.',
-        'count' => $agendamentos->count(),
-        'data' => $agendamentos
-    ], 200);
-}
-
-    public function destroy($id)
+    public function show($id)
     {
         $user = Auth::user();
-
-        $agendamento = Agendamento::where('id', $id)
-            ->where('user_id', $user->id)
-            ->first();
+        $agendamento = Agendamento::with(['hemocentro', 'doador', 'triagem', 'doacao'])->find($id);
 
         if (!$agendamento) {
-            return response()->json(['message' => 'Agendamento não encontrado ou não pertence a você.'], 404);
+            return response()->json(['message' => 'Agendamento não encontrado.'], 404);
+        }
+
+        if ($user->role_id == 1 && $agendamento->user_id != $user->id) {
+            return response()->json(['message' => 'Acesso negado.'], 403);
+        }
+
+        return response()->json($agendamento);
+    }
+
+    /**
+     * Confirmar agendamento (Doador ou Funcionário).
+     */
+    public function confirmar($id)
+    {
+        $user = Auth::user();
+        $agendamento = Agendamento::findOrFail($id);
+
+        // Se for doador, só pode confirmar o dele
+        if ($user->role_id == 1 && $agendamento->user_id != $user->id) {
+            return response()->json(['message' => 'Acesso negado.'], 403);
+        }
+
+        $agendamento->update([
+            'status_agendamento' => 'CON',
+            'coletador_id'       => $user->role_id != 1 ? $user->id : $agendamento->coletador_id
+        ]);
+
+        return response()->json([
+            'message' => 'Agendamento confirmado com sucesso.',
+            'data'    => $agendamento
+        ]);
+    }
+
+    /**
+     * Cancelar agendamento (Doador ou Funcionário).
+     */
+    public function cancelar($id)
+    {
+        $user = Auth::user();
+        $agendamento = Agendamento::findOrFail($id);
+
+        if ($user->role_id == 1 && $agendamento->user_id != $user->id) {
+            return response()->json(['message' => 'Acesso negado.'], 403);
         }
 
         $agendamento->update(['status_agendamento' => 'CAN']);
 
-        return response()->json(['message' => 'Agendamento cancelado com sucesso.'], 200);
+        return response()->json([
+            'message' => 'Agendamento cancelado com sucesso.',
+            'data'    => $agendamento
+        ]);
+    }
+
+    public function destroy($id)
+    {
+        return $this->cancelar($id);
     }
 }

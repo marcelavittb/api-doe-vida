@@ -10,32 +10,50 @@ class UserSeeder extends Seeder
 {
     public function run(): void
     {
-        // Criando um Doador para testes
+        // 1. Criando 8 Doadores (IDs 1 a 8 aproximadamente)
+        $tipos = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+        for ($i = 1; $i <= 8; $i++) {
+            User::create([
+                'name'      => "Doador Exemplo $i",
+                'email'     => "doador$i@email.com",
+                'password'  => Hash::make('password'),
+                'cpf'       => "1234567890$i",
+                'tipo_sang' => $tipos[array_rand($tipos)],
+                'sexo'      => ($i % 2 == 0) ? 'M' : 'F',
+                'telefone'  => "(11) 99999-000$i",
+                'data_nasc' => '1990-01-01',
+                'role_id'   => 1,
+            ]);
+        }
+
+        // 2. Funcionário Hemocentro 1
         User::create([
-            'name' => 'Dr. Anderson Funcionário',
-            'email' => 'funcionario2@email.com',
-            'password' => Hash::make('password'),
-            'tipo_sang'=> 'B-',
-            'telefone'=>'(11) 98765-4321',
-            'data_nasc'=> '1999-06-15',
-            'role_id'=>1,
-            'hemocentro_id'=> 1,
-            // Adicione aqui outros campos que você tenha na sua migration de users
+            'name'          => 'Funcionário H1',
+            'email'         => 'funcionario1@email.com',
+            'password'      => Hash::make('password'),
+            'cpf'           => '11111111111',
+            'role_id'       => 2,
+            'hemocentro_id' => 1,
         ]);
 
-        // Criando um Funcionário para testes
+        // 3. Funcionário Hemocentro 2 (Diferente)
         User::create([
-            'name' => 'Dr. Anderson Funcionário',
-            'email' => 'funcionario@email.com',
-            'password' => Hash::make('password'),
-            'tipo_sang'=> 'A+',
-            'telefone'=>'(11) 98765-4321',
-            'data_nasc'=> '1999-05-15',
-            'role_id'=>1,
-            'hemocentro_id'=> 1,
-
+            'name'          => 'Funcionário H2',
+            'email'         => 'funcionario2@email.com',
+            'password'      => Hash::make('password'),
+            'cpf'           => '22222222222',
+            'role_id'       => 2,
+            'hemocentro_id' => 2,
         ]);
-        
-        $this->command->info('Usuários (Doador e Funcionário) criados com sucesso!');
+
+        // 4. Admin e Diretor
+        User::create([
+            'name' => 'Diretor H1', 'email' => 'diretor@email.com', 'password' => Hash::make('password'), 'cpf' => '33333333333', 'role_id' => 3, 'hemocentro_id' => 1
+        ]);
+        User::create([
+            'name' => 'Admin Geral', 'email' => 'admin@email.com', 'password' => Hash::make('password'), 'cpf' => '44444444444', 'role_id' => 4
+        ]);
+
+        $this->command->info('8 Doadores e Funcionários em Hemocentros diferentes criados!');
     }
 }

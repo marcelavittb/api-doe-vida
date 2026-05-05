@@ -12,6 +12,7 @@ class Triagem extends Model
     protected $table = 'triagens'; // Definindo o nome da tabela manualmente
 
     protected $fillable = [
+        'agendamento_id',
         'user_id', 
         'funcionario_id', 
         'hemocentro_id', 
@@ -29,6 +30,10 @@ class Triagem extends Model
     ];
 
     // Relacionamentos
+    public function agendamento() {
+        return $this->belongsTo(Agendamento::class, 'agendamento_id');
+    }
+
     public function doador() {
         return $this->belongsTo(User::class, 'user_id');
     }
