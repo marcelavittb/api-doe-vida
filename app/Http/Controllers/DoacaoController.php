@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Doacao;
+use App\Models\Estoque;
 use App\Models\User;
 use App\Models\Triagem;
 use Illuminate\Http\Request;
@@ -13,7 +14,7 @@ class DoacaoController extends Controller
 {
     public function index(Request $request)
     {
-        $user = Auth::user();
+        $user = $request->user() ?: Auth::user();
         $query = Doacao::with(['doador', 'funcionario', 'hemocentro', 'agendamento', 'triagem']);
 
         if ($user->role_id == 1) {
@@ -32,10 +33,14 @@ class DoacaoController extends Controller
 
     public function store(Request $request)
     {
-        $user = Auth::user();
+        $user = $request->user() ?: Auth::user();
 
         if (!$request->has('hemocentro_id') && $user->hemocentro_id) {
             $request->merge(['hemocentro_id' => $user->hemocentro_id]);
+        }
+
+        if ($user->hemocentro_id && (int) $request->hemocentro_id !== (int) $user->hemocentro_id) {
+            return response()->json(['message' => 'Acesso negado para este hemocentro.'], 403);
         }
 
         $rules = [
@@ -85,6 +90,16 @@ class DoacaoController extends Controller
             'quantidade'           => $request->quantidade,
             'data_validade_sangue' => $request->data_validade_sangue,
         ]);
+
+        $estoque = Estoque::firstOrNew([
+            'hemocentro_id' => $request->hemocentro_id,
+            'tipo_sangue' => $request->tipo_sangue,
+        ]);
+
+        $estoque->quantidade = ($estoque->quantidade ?? 0) + $request->quantidade;
+        $estoque->quantidade_minima = $estoque->quantidade_minima ?? 5000;
+        $estoque->atualizado_em = now();
+        $estoque->save();
 
         // Atualiza a restrição biológica do doador
         $doador = User::find($request->user_id);

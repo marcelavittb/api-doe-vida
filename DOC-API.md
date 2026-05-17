@@ -104,6 +104,30 @@ Os caminhos abaixo são relativos ao prefixo padrão `/api` do Laravel.
 
 ---
 
+## Estoque
+
+### GET /api/estoque
+- **Ação**: Lista o estoque de bolsas de sangue.
+- **Filtros query string**: `hemocentro_id`, `tipo_sangue`.
+- **Regra**: Funcionário vê apenas o estoque do seu hemocentro.
+
+### GET /api/estoque/{id}
+- **Ação**: Exibe detalhes de um registro de estoque específico.
+
+### POST /api/auth/estoque
+- **Ação**: Incrementa ou cria um registro de estoque para um tipo sanguíneo.
+- **Body JSON esperado**:
+  - `hemocentro_id`: Obrigatório (se não for funcionário vinculado).
+  - `tipo_sangue`: `A+`, `A-`, `B+`, `B-`, `AB+`, `AB-`, `O+`, `O-`.
+  - `quantidade`: Valor a ser somado ao estoque atual.
+  - `quantidade_minima`: (Opcional) Define o alerta de estoque baixo.
+
+### PUT /api/auth/estoque/{id}
+- **Ação**: Atualiza diretamente os valores de um registro de estoque.
+- **Body JSON esperado**: `quantidade`, `quantidade_minima`.
+
+---
+
 ## Status e Enums
 
 ### Status Agendamento

@@ -19,9 +19,10 @@ class DatabaseSeeder extends Seeder
             RoleSeeder::class,
             HemocentroSeeder::class,
             UserSeeder::class,
-            TriagemSeeder::class,
             AgendamentoSeeder::class,
+            TriagemSeeder::class,
             DoacaoSeeder::class,
+            EstoqueSeeder::class,
         ]);
         
     }
