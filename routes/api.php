@@ -4,6 +4,7 @@ use App\Http\Controllers\AgendamentoController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DoacaoController;
 use App\Http\Controllers\EstoqueController;
+use App\Http\Controllers\EstatisticaController;
 use App\Http\Controllers\HemocentroController;
 use App\Http\Controllers\TriagemController;
 use App\Http\Controllers\UserController;
@@ -68,6 +69,10 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/estoque', [EstoqueController::class, 'index']);
     Route::get('/estoque/{id}', [EstoqueController::class, 'show']);
+
+    Route::get('/estatisticas/funcionario', [EstatisticaController::class, 'funcionario']);
+    Route::get('/estatisticas/diretor', [EstatisticaController::class, 'diretor']);
+    Route::get('/estatisticas/admin', [EstatisticaController::class, 'admin']);
 
     Route::prefix('auth')->group(function () {
         Route::post('/doacoes', [DoacaoController::class, 'store']);
