@@ -35,6 +35,7 @@ class AuthRegisterMinorTest extends TestCase
             'responsavel_cpf' => '11144477735',
             'responsavel_data_nasc' => now()->subYears(40)->format('d/m/Y'),
             'responsavel_telefone' => '41988887777',
+            'lgpd_aceite' => true,
         ]);
 
         $response->assertCreated()
@@ -68,6 +69,7 @@ class AuthRegisterMinorTest extends TestCase
             'responsavel_cpf' => '11144477735',
             'responsavel_data_nasc' => now()->subYears(40)->format('d/m/Y'),
             'responsavel_telefone' => '41988887777',
+            'lgpd_aceite' => true,
         ]);
 
         $response->assertStatus(422)
@@ -94,6 +96,7 @@ class AuthRegisterMinorTest extends TestCase
             'responsavel_cpf' => '11144477735',
             'responsavel_data_nasc' => now()->subYears(101)->format('d/m/Y'),
             'responsavel_telefone' => '41988887777',
+            'lgpd_aceite' => true,
         ]);
 
         $response->assertStatus(422)

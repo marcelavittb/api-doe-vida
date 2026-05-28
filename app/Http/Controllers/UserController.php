@@ -20,7 +20,7 @@ class UserController extends Controller
             'email' => 'required|email|unique:users,email',
             'password' => 'required|min:6',
             'cpf' => 'required|string|max:14|unique:users,cpf',
-            'role' => 'required|string|in:doador,funcionario,diretor,admin',
+            'role' => ['required', 'string', 'exists:roles,name'],
             'hemocentro_id' => [
                 Rule::requiredIf(fn () => in_array($request->role, ['funcionario', 'diretor'], true)),
                 'nullable',
@@ -118,7 +118,7 @@ class UserController extends Controller
             'email' => 'sometimes|email|unique:users,email,' . $id,
             'password' => 'sometimes|min:6',
             'cpf' => 'sometimes|string|max:14|unique:users,cpf,' . $id,
-            'role' => 'sometimes|string|in:doador,funcionario,diretor,admin',
+            'role' => ['sometimes', 'string', 'exists:roles,name'],
             'hemocentro_id' => [
                 Rule::requiredIf(function () use ($request, $user) {
                     $role = $request->role ?? $user->getRoleNames()->first();
@@ -207,10 +207,10 @@ class UserController extends Controller
 
     private function buscarRole(string $nome): Role
     {
-        return Role::firstOrCreate([
+        return Role::where([
             'name' => $nome,
             'guard_name' => 'api',
-        ]);
+        ])->firstOrFail();
     }
 
     private function formatarData(string $data): string

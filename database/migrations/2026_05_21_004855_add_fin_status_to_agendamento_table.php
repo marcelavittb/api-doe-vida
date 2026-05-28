@@ -12,6 +12,10 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (DB::connection()->getDriverName() !== 'mysql') {
+            return;
+        }
+
         // No MySQL, para alterar um ENUM, precisamos redeclarar a coluna
         // Como o Laravel não tem um método nativo perfeito para ENUM em 'change', 
         // usamos DB::statement para garantir compatibilidade com MySQL.
@@ -23,6 +27,10 @@ return new class extends Migration
      */
     public function down(): void
     {
+        if (DB::connection()->getDriverName() !== 'mysql') {
+            return;
+        }
+
         DB::statement("ALTER TABLE agendamento MODIFY COLUMN status_agendamento ENUM('AGE', 'CAN', 'CON', 'EXC') DEFAULT 'AGE'");
     }
 };

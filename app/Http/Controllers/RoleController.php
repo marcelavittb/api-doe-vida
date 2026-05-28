@@ -3,12 +3,14 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 
 class RoleController extends Controller
 {
-    private const ROLES_SISTEMA = ['doador', 'funcionario', 'diretor', 'admin'];
+    private const ROLES_SISTEMA = ['doador', 'funcionario', 'diretor', 'admin', 'enfermeiro'];
 
     private const PERMISSIONS = [
         'Agendamentos' => [
@@ -63,97 +65,82 @@ class RoleController extends Controller
 
     public function index()
     {
-        $roles = Role::with('permissions')->withCount('users')->orderBy('id')->get()
-            ->map(fn($r) => [
-                'id'          => $r->id,
-                'name'        => $r->name,
-                'guard_name'  => $r->guard_name,
-                'users_count' => $r->users_count,
-                'sistema'     => in_array($r->name, self::ROLES_SISTEMA),
-                'permissions' => $r->permissions->pluck('name')->values(),
-            ]);
+        $userCounts = DB::table('users')
+            ->select('role_id', DB::raw('COUNT(*) as total'))
+            ->whereNull('deletado_em')
+            ->groupBy('role_id')
+            ->pluck('total', 'role_id');
+
+        $roles = Role::with('permissions')->orderBy('id')->get()
+            ->each(fn (Role $role) => $role->setAttribute('users_count', (int) ($userCounts[$role->id] ?? 0)))
+            ->map(fn ($role) => $this->serializeRole($role));
 
         return response()->json($roles);
     }
 
     public function store(Request $request)
     {
-        $request->validate([
-            'name'          => 'required|string|max:50|unique:roles,name',
+        $validated = $request->validate([
+            'name'          => 'required|string|max:50|regex:/^[a-z0-9_]+$/|unique:roles,name',
             'permissions'   => 'array',
-            'permissions.*' => 'string',
+            'permissions.*' => ['string', Rule::in($this->permissionNames())],
         ]);
 
+        $name = strtolower(trim($validated['name']));
+
+        if (in_array($name, self::ROLES_SISTEMA, true)) {
+            return response()->json(['message' => 'Roles do sistema nao podem ser criadas pelo dashboard.'], 422);
+        }
+
         $role = Role::create([
-            'name'       => strtolower(trim($request->name)),
+            'name'       => $name,
             'guard_name' => 'api',
         ]);
 
-        if (!empty($request->permissions)) {
-            $this->ensurePermissionsExist($request->permissions);
-            $role->syncPermissions($request->permissions);
+        if (!empty($validated['permissions'])) {
+            $this->ensurePermissionsExist($validated['permissions']);
+            $role->syncPermissions($validated['permissions']);
         }
 
-        return response()->json([
-            'id'          => $role->id,
-            'name'        => $role->name,
-            'guard_name'  => $role->guard_name,
-            'users_count' => 0,
-            'sistema'     => false,
-            'permissions' => collect($request->permissions ?? [])->values(),
-        ], 201);
+        return response()->json($this->serializeRole($role->fresh('permissions')), 201);
     }
 
     public function update(Request $request, Role $role)
     {
-        if (in_array($role->name, self::ROLES_SISTEMA)) {
-            // Roles do sistema só podem ter permissões atualizadas, não renomeadas
-            if ($request->has('permissions')) {
-                $this->ensurePermissionsExist($request->permissions);
-                $role->syncPermissions($request->permissions);
-            }
-
-            return response()->json([
-                'id'          => $role->id,
-                'name'        => $role->name,
-                'guard_name'  => $role->guard_name,
-                'users_count' => $role->users()->count(),
-                'sistema'     => true,
-                'permissions' => $role->permissions->pluck('name')->values(),
-            ]);
+        if (in_array($role->name, self::ROLES_SISTEMA, true)) {
+            return response()->json(['message' => 'Roles do sistema nao podem ser alteradas.'], 422);
         }
 
-        $request->validate([
-            'name'          => 'required|string|max:50|unique:roles,name,' . $role->id,
+        $validated = $request->validate([
+            'name'          => 'required|string|max:50|regex:/^[a-z0-9_]+$/|unique:roles,name,' . $role->id,
             'permissions'   => 'array',
-            'permissions.*' => 'string',
+            'permissions.*' => ['string', Rule::in($this->permissionNames())],
         ]);
 
-        $role->update(['name' => strtolower(trim($request->name))]);
+        $name = strtolower(trim($validated['name']));
 
-        if ($request->has('permissions')) {
-            $this->ensurePermissionsExist($request->permissions);
-            $role->syncPermissions($request->permissions);
+        if (in_array($name, self::ROLES_SISTEMA, true)) {
+            return response()->json(['message' => 'Nomes de roles do sistema sao reservados.'], 422);
         }
 
-        return response()->json([
-            'id'          => $role->id,
-            'name'        => $role->name,
-            'guard_name'  => $role->guard_name,
-            'users_count' => $role->users()->count(),
-            'sistema'     => false,
-            'permissions' => $role->permissions->pluck('name')->values(),
-        ]);
+        $role->update(['name' => $name]);
+
+        if (array_key_exists('permissions', $validated)) {
+            $this->ensurePermissionsExist($validated['permissions']);
+            $role->syncPermissions($validated['permissions']);
+        }
+
+        return response()->json($this->serializeRole($role->fresh('permissions')));
     }
 
     public function destroy(Role $role)
     {
-        if (in_array($role->name, self::ROLES_SISTEMA)) {
-            return response()->json(['message' => 'Roles do sistema não podem ser removidas.'], 422);
+        if (in_array($role->name, self::ROLES_SISTEMA, true)) {
+            return response()->json(['message' => 'Roles do sistema nao podem ser removidas.'], 422);
         }
 
         if ($role->users()->exists()) {
-            return response()->json(['message' => 'Role possui usuários vinculados. Remova-os antes de excluir.'], 422);
+            return response()->json(['message' => 'Role possui usuarios vinculados. Remova-os antes de excluir.'], 422);
         }
 
         $role->delete();
@@ -161,10 +148,30 @@ class RoleController extends Controller
         return response()->json(null, 204);
     }
 
+    private function serializeRole(Role $role): array
+    {
+        return [
+            'id'          => $role->id,
+            'name'        => $role->name,
+            'guard_name'  => $role->guard_name,
+            'users_count' => (int) ($role->users_count ?? 0),
+            'sistema'     => in_array($role->name, self::ROLES_SISTEMA, true),
+            'permissions' => $role->permissions->pluck('name')->values(),
+        ];
+    }
+
     private function ensurePermissionsExist(array $names): void
     {
         foreach ($names as $name) {
             Permission::firstOrCreate(['name' => $name, 'guard_name' => 'api']);
         }
+    }
+
+    private function permissionNames(): array
+    {
+        return collect(self::PERMISSIONS)
+            ->flatMap(fn (array $permissions) => array_keys($permissions))
+            ->values()
+            ->all();
     }
 }

@@ -1,7 +1,12 @@
 {
   "permissions": {
     "allow": [
-      "Bash(php artisan *)"
+      "Bash(php artisan *)",
+      "Bash(Get-ChildItem -Path \"c:\\\\xampp\\\\htdocs\\\\api-doe-vida\" -Directory)",
+      "Bash(Select-Object Name)",
+      "Bash(php -r \"require 'c:/xampp/htdocs/api-doe-vida/vendor/autoload.php'; echo class_exists\\('Barryvdh\\\\\\\\DomPDF\\\\\\\\ServiceProvider'\\) ? 'EXISTS' : 'NOT FOUND';\")",
+      "Bash(php -r \"require 'c:/xampp/htdocs/api-doe-vida/vendor/autoload.php'; var_dump\\(file_exists\\('c:/xampp/htdocs/api-doe-vida/vendor/barryvdh/laravel-dompdf/src/ServiceProvider.php'\\)\\);\")",
+      "Bash(composer install *)"
     ]
   }
 }

@@ -94,8 +94,19 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/certificados',          [\App\Http\Controllers\CertificadoController::class, 'index']);
     Route::get('/certificados/{id}/pdf', [\App\Http\Controllers\CertificadoController::class, 'download']);
 
-    // Relatórios PDF
+    // Relatórios JSON (insights para dashboard/frontend)
     Route::prefix('relatorios')->group(function () {
+        Route::get('/resumo',              [RelatorioController::class, 'resumo']);
+        Route::get('/doacoes/json',        [RelatorioController::class, 'donationsSummary']);
+        Route::get('/estoque/json',        [RelatorioController::class, 'bloodStock']);
+        Route::get('/performance/mensal',  [RelatorioController::class, 'performanceMonthly']);
+
+        // Relatórios PDF (nova URL + alias para compatibilidade)
+        Route::get('/doacoes/pdf',  [RelatorioController::class, 'pdfDoacoes']);
+        Route::get('/estoque/pdf',  [RelatorioController::class, 'pdfEstoque']);
+        Route::get('/doadores/pdf', [RelatorioController::class, 'pdfDoadores']);
+
+        // Aliases legados (mantidos para não quebrar clientes existentes)
         Route::get('/doacoes',  [RelatorioController::class, 'pdfDoacoes']);
         Route::get('/estoque',  [RelatorioController::class, 'pdfEstoque']);
         Route::get('/doadores', [RelatorioController::class, 'pdfDoadores']);
@@ -159,14 +170,19 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/hemocentros/{hemocentro}', [HemocentroController::class, 'destroy']);
 
         // Campanhas — escrita e disparo
-        Route::post('/campanhas',               [CampanhaController::class, 'store']);
-        Route::put('/campanhas/{id}',           [CampanhaController::class, 'update']);
-        Route::delete('/campanhas/{id}',        [CampanhaController::class, 'destroy']);
-        Route::post('/campanhas/{id}/disparar', [CampanhaController::class, 'disparar']);
-
         // Roles — escrita
         Route::post('/roles',          [RoleController::class, 'store']);
         Route::put('/roles/{role}',    [RoleController::class, 'update']);
         Route::delete('/roles/{role}', [RoleController::class, 'destroy']);
+    });
+
+    Route::middleware('role_or_permission:admin,gerenciar_campanhas')->prefix('auth')->group(function () {
+        Route::post('/campanhas',        [CampanhaController::class, 'store']);
+        Route::put('/campanhas/{id}',    [CampanhaController::class, 'update']);
+        Route::delete('/campanhas/{id}', [CampanhaController::class, 'destroy']);
+    });
+
+    Route::middleware('role_or_permission:admin,disparar_campanhas')->prefix('auth')->group(function () {
+        Route::post('/campanhas/{id}/disparar', [CampanhaController::class, 'disparar']);
     });
 });
