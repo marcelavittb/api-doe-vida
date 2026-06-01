@@ -1,7 +1,26 @@
 services:
   - type: web
     name: api-doe-vida
-    runtime: php
+    runtime: docker
     plan: free
-    buildCommand: composer install --no-dev --optimize-autoloader
-    startCommand: vendor/bin/heroku-php-apache2 public/
+    region: ohio
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: false
+      - key: APP_KEY
+        fromContext: secret
+      - key: DB_CONNECTION
+        value: pgsql
+      - key: DB_HOST
+        fromContext: secret
+      - key: DB_PORT
+        value: 5432
+      - key: DB_DATABASE
+        fromContext: secret
+      - key: DB_USERNAME
+        fromContext: secret
+      - key: DB_PASSWORD
+        fromContext: secret
+      # Adicione outras variáveis necessárias como JWT_SECRET, etc.
