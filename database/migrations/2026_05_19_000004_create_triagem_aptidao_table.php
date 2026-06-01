@@ -15,19 +15,9 @@ return new class extends Migration
                 ->constrained('triagens')
                 ->onDelete('cascade')
                 ->comment('Uma aptidao por triagem');
-            $table->enum('resultado', ['apto', 'inapto_temporario', 'inapto_definitivo'])
+            $table->string('resultado')
                 ->comment('Resultado formal da triagem clinica');
-            $table->enum('categoria_inaptidao', [
-                'sinais_vitais_fora_do_padrao',
-                'intervalo_minimo_nao_cumprido',
-                'medicamento_incompativel',
-                'cirurgia_recente',
-                'viagem_area_de_risco',
-                'comportamento_de_risco',
-                'condicao_clinica_na_triagem',
-                'resultado_sorologico_alterado',
-                'outro',
-            ])->nullable()->comment('Categoria da inaptidao - nunca expoe diagnostico ao doador');
+            $table->string('categoria_inaptidao')->nullable()->comment('Categoria da inaptidao - nunca expoe diagnostico ao doador');
             $table->text('observacoes_internas')->nullable()
                 ->comment('Visivel apenas para funcionarios e diretores - nunca para o doador');
             $table->text('notificacao_doador')->nullable()

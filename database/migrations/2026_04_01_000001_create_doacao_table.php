@@ -30,7 +30,7 @@ return new class extends Migration
     $table->dateTime('data_validade_sangue')->nullable();
     $table->dateTime('retirada_em')->nullable();
     
-    $table->enum('tipo_sangue', ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'])->nullable();
+    $table->string('tipo_sangue')->nullable();
     $table->float('quantidade')->nullable();
     $table->float('quantidade_retirada')->nullable();
     $table->dateTime('atualizado_em')->nullable();

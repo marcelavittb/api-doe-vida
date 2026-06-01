@@ -77,11 +77,11 @@ class UserController extends Controller
 
         // Filtros de busca
         $query->when($request->search, function ($q, $search) {
-            $q->where('name', 'like', "%{$search}%");
+            $q->where('name', DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'like', "%{$search}%");
         });
 
         $query->when($request->cpf, function ($q, $cpf) {
-            $q->where('cpf', 'like', "%{$cpf}%");
+            $q->where('cpf', DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'like', "%{$cpf}%");
         });
 
         $userRoleName = $user->getRoleNames()->first() ?? '';

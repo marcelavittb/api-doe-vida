@@ -16,8 +16,8 @@ return new class extends Migration
             $table->string('password');
             $table->rememberToken();
 
-            $table->enum('tipo_sang', ['A+','A-','B+','B-','AB+','AB-','O+','O-'])->nullable();
-            $table->enum('sexo', ['M','F','Outro'])->nullable();
+            $table->string('tipo_sang')->nullable();
+            $table->string('sexo')->nullable();
             $table->date('data_nasc')->nullable();
             $table->string('cpf', 14)->unique()->nullable();
             $table->string('telefone', 20)->nullable();

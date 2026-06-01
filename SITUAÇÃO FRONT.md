@@ -133,6 +133,62 @@ O front foi ajustado para a agenda não depender de `/estoque` ou `/estatisticas
 Após sucesso, o front mantém o card visível como "Doação realizada", com visual verde.
 
 ---
+## Painel do Diretor
+
+Arquivo principal: `src/components/dashboards/DirectorDashboard.tsx`.
+
+### Estatísticas e Indicadores (Ação Necessária)
+
+O dashboard foi limpo de dados mockados e agora depende 100% da API para exibir informações de performance. 
+
+- **Endpoint necessário:** `GET /api/estatisticas/diretor`
+- **Comportamento do Front:** Se o valor for `null` ou o array estiver vazio, o card/gráfico correspondente **não será exibido**, evitando desinformação.
+
+**Estrutura de dados esperada (JSON):**
+
+```json
+{
+  "doacoes_mes": 150,                // Inteiro: Total de doações concluídas no mês
+  "crescimento_mes": 8.5,            // Float: % de crescimento vs mês anterior
+  "agendamentos_hoje": 12,           // Inteiro: Total de agendamentos para a data atual
+  "confirmados_hoje": 10,            // Inteiro: Agendamentos com presença confirmada hoje
+  "taxa_comparecimento": 83.3,       // Float: (confirmados / total) * 100
+  "media_diaria": 7.2,               // Float: Média de doações por dia útil no mês
+  "satisfacao": 4.8,                 // Float: Média de avaliações pós-doação (0 se não houver)
+  "estoque_critico": ["O-", "A-"],   // Array: Tipos sanguíneos abaixo do nível mínimo
+  "doacoes_por_mes": [               // Array: Dados para o gráfico de evolução (últimos 6-12 meses)
+    { "mes": "Jan", "total": 120 },
+    { "mes": "Fev", "total": 150 }
+  ],
+  "doacoes_por_tipo": {              // Objeto: Dados para o gráfico de pizza (mês atual)
+    "O+": 45,
+    "A+": 38,
+    "B+": 20,
+    "AB+": 10,
+    "O-": 5,
+    "A-": 12,
+    "B-": 8,
+    "AB-": 7
+  }
+}
+```
+
+### Gestão de Hemocentro
+
+- O front-end tenta exibir o nome do hemocentro via `user.hemocentro.nome`. 
+- **Necessidade:** O endpoint de autenticação (`/api/auth/me` ou `/api/auth/login`) deve retornar o relacionamento do hemocentro populado para que o diretor veja os dados da sua unidade corretamente.
+---
+
+## Pontos que dependem do backend
+
+- Criar/Finalizar endpoint `GET /api/estatisticas/diretor`.
+- Persistir exame de elegibilidade no usuário.
+- Bloquear agendamento sem elegibilidade válida.
+- Gerar/listar certificados.
+- Garantir que `GET /api/agendamentos` retorne cancelados para funcionário, se a regra for permitir reabrir pela agenda.
+- Padronizar o status de doação concluída: hoje o front aceita `FIN`, `DOA`, `REALIZADA` e presença de `doacao_id`, mas o ideal é o backend ter um padrão único.
+
+---
 
 ## Pontos que dependem do backend
 

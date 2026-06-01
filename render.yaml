@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: api-doe-vida
+    env: php
+    plan: free
+    buildCommand: composer install --no-dev --optimize-autoloader
+    startCommand: vendor/bin/heroku-php-apache2 public/

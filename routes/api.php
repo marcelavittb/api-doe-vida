@@ -41,6 +41,8 @@ Route::middleware('auth:sanctum')->group(function () {
     // Auth utilitários
     Route::get('/auth/me', function (Request $request) {
         $user = $request->user();
+        $user->load('hemocentro');
+        
         return response()->json([
             'user'        => $user,
             'roles'       => $user->getRoleNames(),

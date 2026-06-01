@@ -16,7 +16,7 @@ return new class extends Migration
             Schema::create('estoque', function (Blueprint $table) {
                 $table->id();
                 $table->foreignId('hemocentro_id')->constrained('hemocentros')->onDelete('cascade');
-                $table->enum('tipo_sangue', ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']);
+                $table->string('tipo_sangue');
                 $table->float('quantidade')->default(0);
                 $table->float('quantidade_minima')->default(5000);
                 $table->timestamp('atualizado_em')->useCurrent()->useCurrentOnUpdate();

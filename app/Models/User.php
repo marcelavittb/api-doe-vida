@@ -77,6 +77,11 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasMany(Triagem::class, 'user_id');
     }
 
+    public function hemocentro()
+    {
+        return $this->belongsTo(Hemocentro::class, 'hemocentro_id');
+    }
+
     public function preTriagemRespostas()
     {
         return $this->hasMany(PreTriagemResposta::class, 'user_id');

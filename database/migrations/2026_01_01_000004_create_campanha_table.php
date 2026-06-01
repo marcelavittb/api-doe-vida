@@ -21,7 +21,7 @@ return new class extends Migration
             $table->string('criado_por', 255)->nullable();
             $table->dateTime('data_publi')->nullable();
             $table->dateTime('data_expiracao')->nullable();
-            $table->enum('tipo_sangue', ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'])->nullable();
+            $table->string('tipo_sangue')->nullable();
             $table->boolean('status')->nullable();
             $table->timestamp('criado_em')->nullable();
             $table->timestamp('atualizado_em')->nullable();

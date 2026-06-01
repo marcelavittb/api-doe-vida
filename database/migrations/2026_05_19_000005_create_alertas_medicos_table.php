@@ -21,12 +21,8 @@ return new class extends Migration
                 ->constrained('users')
                 ->onDelete('cascade')
                 ->comment('Funcionario que criou o alerta');
-            $table->enum('tipo_alerta', [
-                'resultado_sorologico',
-                'convocacao_retorno',
-                'outro',
-            ]);
-            $table->enum('status', ['pendente', 'compareceu', 'encerrado'])
+            $table->string('tipo_alerta');
+            $table->string('status')
                 ->default('pendente');
             $table->text('notificacao_doador')
                 ->comment('Mensagem generica exibida ao doador - sem diagnostico');

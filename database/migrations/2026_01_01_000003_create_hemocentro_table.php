@@ -24,7 +24,7 @@ return new class extends Migration
             $table->string('complemento', 255)->nullable();
             $table->string('razao_social', 255)->nullable();
             $table->string('cnpj', 20)->nullable();
-            $table->enum('status_agendamento', ['ativo', 'inativo', 'pendente'])->nullable();
+            $table->string('status_agendamento')->nullable();
             $table->dateTime('criado_em')->nullable();
             $table->string('criado_por', 255)->nullable();
             $table->dateTime('deletado_em')->nullable();

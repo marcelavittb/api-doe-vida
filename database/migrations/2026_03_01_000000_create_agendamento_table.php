@@ -23,7 +23,7 @@ return new class extends Migration
             $table->foreignId('hemocentro_id')->nullable()->constrained('hemocentros')->onDelete('cascade');
             
             $table->dateTime('data_hora_doacao')->nullable();
-            $table->enum('status_agendamento', ['AGE', 'CAN', 'CON', 'EXC'])->default('AGE');
+            $table->string('status_agendamento')->default('AGE');
             
             $table->timestamp('criado_em')->useCurrent();
             $table->timestamp('atualizado_em')->useCurrent()->useCurrentOnUpdate();

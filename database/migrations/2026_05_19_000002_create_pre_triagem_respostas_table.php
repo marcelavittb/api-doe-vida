@@ -19,7 +19,7 @@ return new class extends Migration
             $table->foreignId('opcao_id')
                 ->constrained('triagem_opcoes')
                 ->onDelete('cascade');
-            $table->enum('resultado_geral', ['apto', 'inapto', 'consulte_medico'])->nullable()
+            $table->string('resultado_geral')->nullable()
                 ->comment('Resultado geral calculado ao final do questionario');
             $table->timestamp('respondido_em')->useCurrent();
         });

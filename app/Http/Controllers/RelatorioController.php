@@ -708,8 +708,16 @@ class RelatorioController extends Controller
 
     private function monthExpression(): string
     {
-        return DB::connection()->getDriverName() === 'sqlite'
-            ? "strftime('%Y-%m', data_hora_doacao)"
-            : "DATE_FORMAT(data_hora_doacao, '%Y-%m')";
+        $driver = DB::connection()->getDriverName();
+        
+        if ($driver === 'sqlite') {
+            return "strftime('%Y-%m', data_hora_doacao)";
+        }
+        
+        if ($driver === 'pgsql') {
+            return "TO_CHAR(data_hora_doacao, 'YYYY-MM')";
+        }
+
+        return "DATE_FORMAT(data_hora_doacao, '%Y-%m')";
     }
 }

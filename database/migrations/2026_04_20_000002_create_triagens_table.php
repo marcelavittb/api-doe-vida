@@ -17,7 +17,7 @@ return new class extends Migration
         $table->foreignId('hemocentro_id')->constrained('hemocentros');
         
         $table->dateTime('data_triagem');
-        $table->enum('status_triagem', ['P', 'C', 'E'])->default('P');
+        $table->string('status_triagem')->default('P');
         
         $table->boolean('apto')->default(false);
         $table->text('motivo_inaptidao')->nullable();

@@ -193,25 +193,26 @@ Os caminhos abaixo são relativos ao prefixo padrão `/api` do Laravel.
 ---
 
 ## Relatórios & Estatísticas (Dashboards)
-Endpoints otimizados para dashboards gerenciais com dados agregados. Exigem autenticação.
+Endpoints otimizados para dashboards gerenciais com dados reais. Exigem autenticação.
 
-### GET /api/reports/donations-summary
-- **Ação**: Retorna o volume total de agendamentos agrupado por status.
-- **Parâmetros (Query String)**:
-  - `dias`: (Opcional, padrão 30) Número de dias retroativos para o resumo.
-- **Retorno**: Lista de objetos com `label` e `total`.
+### GET /api/estatisticas/diretor
+- **Ação**: Retorna indicadores de performance da unidade.
+- **Retorno JSON**:
+  - `doacoes_mes`: Total de doações concluídas no mês.
+  - `crescimento_mes`: % de crescimento vs mês anterior.
+  - `agendamentos_hoje`: Total de agendamentos para hoje.
+  - `confirmados_hoje`: Presenças confirmadas hoje.
+  - `taxa_comparecimento`: % de comparecimento (confirmados/total).
+  - `media_diaria`: Média de doações por dia no mês.
+  - `estoque_critico`: Lista de tipos sanguíneos em nível baixo.
+  - `doacoes_por_mes`: Evolução histórica (últimos 12 meses).
+  - `doacoes_por_tipo`: Distribuição por tipo sanguíneo.
 
-### GET /api/reports/blood-stock
-- **Ação**: Retorna o saldo atual de bolsas de sangue por tipo.
-- **Parâmetros (Query String)**:
-  - `hemocentro_id`: (Admin apenas) Filtra por unidade específica.
-- **Retorno**: Lista de objetos com `tipo` e `quantidade`.
+### GET /api/estatisticas/funcionario
+- **Ação**: Retorna dados operacionais do dia e estoque da unidade.
 
-### GET /api/reports/performance-monthly
-- **Ação**: Retorna a quantidade de doações realizadas por mês nos últimos 12 meses.
-- **Parâmetros (Query String)**:
-  - `hemocentro_id`: (Admin apenas) Filtra por unidade específica.
-- **Finalidade**: Construção de gráficos de linha/tendência.
+### GET /api/estatisticas/admin
+- **Ação**: Retorna visão global de todos os hemocentros e usuários.
 
 ---
 
@@ -255,3 +256,4 @@ Endpoints que geram arquivos PDF para download.
 ## Observações Gerais
 - **Segurança**: Rotas sob `/auth/` exigem token Sanctum.
 - **Hierarquia**: O fluxo ideal é Agendamento -> Triagem -> Doação.
+agem -> Doação.

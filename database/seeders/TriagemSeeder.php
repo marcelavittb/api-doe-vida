@@ -12,7 +12,9 @@ class TriagemSeeder extends Seeder
 {
     public function run(): void
     {
-        Triagem::truncate();
+        // Removido truncate() para evitar erros de FK no Postgres.
+        // Se quiser limpar a tabela, prefira Triagem::query()->delete() ou rode migrations frescas.
+        
         $doadores = User::where('role_id', 1)->get();
         $funcionarios = User::where('role_id', 2)->get();
         $hemocentros = Hemocentro::all();
