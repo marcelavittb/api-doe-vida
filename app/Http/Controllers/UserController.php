@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use Spatie\Permission\Models\Role;
@@ -75,15 +76,6 @@ class UserController extends Controller
         $user = $request->user();
         $query = User::query();
 
-        // Filtros de busca
-        $query->when($request->search, function ($q, $search) {
-            $q->where('name', DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'like', "%{$search}%");
-        });
-
-        $query->when($request->cpf, function ($q, $cpf) {
-            $q->where('cpf', DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'like', "%{$cpf}%");
-        });
-
         $userRoleName = $user->getRoleNames()->first() ?? '';
         $isStaff = in_array($userRoleName, ['funcionario', 'diretor'])
                    || $user->hasAnyPermission(['ver_agendamentos', 'ver_doacoes', 'ver_triagens']);
@@ -92,15 +84,83 @@ class UserController extends Controller
         if ($isStaff && $user->hemocentro_id) {
             $hemocentroId = $user->hemocentro_id;
             $query->where('role_id', 1)
-                ->whereHas('triagens', function ($q) use ($hemocentroId) {
-                    $q->where('hemocentro_id', $hemocentroId);
+                ->where(function ($q) use ($hemocentroId) {
+                    $q->whereHas('triagens', function ($triagens) use ($hemocentroId) {
+                        $triagens->where('hemocentro_id', $hemocentroId);
+                    })->orWhereExists(function ($sub) use ($hemocentroId) {
+                        $sub->select(DB::raw(1))
+                            ->from('doacao')
+                            ->whereColumn('doacao.user_id', 'users.id')
+                            ->where('doacao.hemocentro_id', $hemocentroId);
+                    });
                 });
         } elseif ($isDonor) {
+        // 1. Restrições de visibilidade (Escopo Base Obrigatório)
             $query->where('id', $user->id);
         }
         // Admin e roles customizadas sem hemocentro_id: sem filtro adicional (vê tudo)
 
-        return $query->orderBy('name')->get();
+        // 2. Filtros de busca dinâmica
+        if ($request->filled('search') || $request->filled('name')) {
+            $searchTerm = $request->input('search') ?: $request->input('name');
+            $query->where('users.name', 'like', "%{$searchTerm}%");
+        }
+
+        if ($request->filled('cpf')) {
+            $cpf = $request->input('cpf');
+            $cpfLimpo = preg_replace('/[^0-9]/', '', $cpf);
+            $query->where(function ($q) use ($cpf, $cpfLimpo) {
+                $q->where('users.cpf', 'like', "%{$cpf}%")
+                  ->orWhereRaw("REPLACE(REPLACE(users.cpf, '.', ''), '-', '') LIKE ?", ["%{$cpfLimpo}%"]);
+            });
+        }
+
+        if ($request->filled('tipo_sang')) {
+            $query->where('users.tipo_sang', $request->input('tipo_sang'));
+        }
+
+        if ($request->filled('sexo')) {
+            $query->where('users.sexo', $request->input('sexo'));
+        }
+
+        if ($request->has('status') && $request->input('status') !== null && $request->input('status') !== '') {
+            $statusValue = filter_var($request->input('status'), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+            if ($statusValue !== null) {
+                $query->where('users.status', $statusValue);
+            }
+        }
+
+        if ($request->filled('cidade')) {
+            $query->where('users.cidade', 'like', "%" . $request->input('cidade') . "%");
+        }
+
+        if ($request->filled('idade_min')) {
+            $query->whereRaw('TIMESTAMPDIFF(YEAR, data_nasc, CURDATE()) >= ?', [$request->input('idade_min')]);
+        }
+        if ($request->filled('idade_max')) {
+            $query->whereRaw('TIMESTAMPDIFF(YEAR, data_nasc, CURDATE()) <= ?', [$request->input('idade_max')]);
+        }
+
+        if ($request->filled('data_doacao_inicio') || $request->filled('data_doacao_fim')) {
+            $query->whereHas('doacoes', function ($sub) use ($request) {
+                if ($request->filled('data_doacao_inicio')) {
+                    $sub->where('data_hora_doacao', '>=', $request->input('data_doacao_inicio'));
+                }
+                if ($request->filled('data_doacao_fim')) {
+                    $sub->where('data_hora_doacao', '<=', $request->input('data_doacao_fim'));
+                }
+            });
+        }
+
+        // 3. Adiciona dados para resposta
+        $query->with(['doacoes' => function ($q) {
+            $q->orderBy('data_hora_doacao', 'desc')->limit(1);
+        }, 'doacoes.hemocentro']);
+        $query->withMax('doacoes', 'data_hora_doacao');
+
+        // 4. Paginação
+        $perPage = $request->input('per_page', 15);
+        return $query->orderBy('name')->paginate($perPage);
     }
 
     public function perfilRfmt(Request $request)

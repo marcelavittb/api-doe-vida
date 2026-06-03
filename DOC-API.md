@@ -34,8 +34,9 @@ Os caminhos abaixo são relativos ao prefixo padrão `/api` do Laravel.
 - **Middleware**: `auth:sanctum`
 - **Filtro de Segurança/Privacidade**:
   - **Doador**: Vê apenas seus próprios dados.
-  - **Funcionário/Diretor**: Vê apenas doadores que já realizaram triagem ou doação em seu hemocentro vinculado.
+  - **Funcionário/Diretor**: Vê apenas doadores que já realizaram doação no seu hemocentro vinculado.
   - **Admin**: Vê todos os usuários do sistema.
+- **Retorno**: Inclui dados do doador, nome do hemocentro e detalhes da última doação.
 - **Ordenação**: Alfabética por nome.
 
 ### POST /api/auth/users

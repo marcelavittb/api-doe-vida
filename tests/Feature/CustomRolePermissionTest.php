@@ -30,6 +30,22 @@ class CustomRolePermissionTest extends TestCase
             ->assertJsonPath('data.titulo', 'Campanha Admin');
     }
 
+    public function test_diretor_can_manage_campaigns_without_explicit_permission(): void
+    {
+        $diretor = $this->userWithRole('diretor');
+
+        Sanctum::actingAs($diretor);
+
+        $response = $this->postJson('/api/auth/campanhas', [
+            'titulo' => 'Campanha Diretor',
+            'data_publi' => now()->toDateTimeString(),
+            'data_expiracao' => now()->addDay()->toDateTimeString(),
+        ]);
+
+        $response->assertCreated()
+            ->assertJsonPath('data.titulo', 'Campanha Diretor');
+    }
+
     public function test_custom_role_with_campaign_permission_can_manage_campaigns(): void
     {
         $role = Role::create(['name' => 'marketing_campanhas', 'guard_name' => 'api']);
@@ -119,6 +135,101 @@ class CustomRolePermissionTest extends TestCase
 
         $updateResponse->assertStatus(422);
         $deleteResponse->assertStatus(422);
+    }
+
+    public function test_campaign_creation_rejects_year_out_of_range(): void
+    {
+        $admin = $this->userWithRole('admin');
+
+        Sanctum::actingAs($admin);
+
+        $response = $this->postJson('/api/auth/campanhas', [
+            'titulo' => 'Campanha Ano Invalido',
+            'data_publi' => '99999-12-30T10:00',
+            'data_expiracao' => '99999-12-31T10:00',
+        ]);
+
+        $response->assertStatus(422)
+            ->assertJsonPath('data_publi.0', 'O ano informado deve estar entre 2000 e 2100.');
+    }
+
+    public function test_campaign_creation_rejects_same_publication_and_expiration_day(): void
+    {
+        $admin = $this->userWithRole('admin');
+
+        Sanctum::actingAs($admin);
+
+        $response = $this->postJson('/api/auth/campanhas', [
+            'titulo' => 'Campanha Mesmo Dia',
+            'data_publi' => now()->addDay()->setTime(8, 0)->toDateTimeString(),
+            'data_expiracao' => now()->addDay()->setTime(18, 0)->toDateTimeString(),
+        ]);
+
+        $response->assertStatus(422)
+            ->assertJsonPath('data_expiracao.0', 'A data de expiração deve ser em um dia posterior à data de publicação.');
+    }
+
+    public function test_campaign_creation_rejects_past_publication_or_expiration_dates(): void
+    {
+        $admin = $this->userWithRole('admin');
+
+        Sanctum::actingAs($admin);
+
+        $publicationResponse = $this->postJson('/api/auth/campanhas', [
+            'titulo' => 'Campanha Publicacao Passada',
+            'data_publi' => now()->subDay()->toDateString(),
+            'data_expiracao' => now()->addDay()->toDateString(),
+        ]);
+
+        $expirationResponse = $this->postJson('/api/auth/campanhas', [
+            'titulo' => 'Campanha Expiracao Passada',
+            'data_publi' => now()->toDateString(),
+            'data_expiracao' => now()->subDay()->toDateString(),
+        ]);
+
+        $publicationResponse->assertStatus(422)
+            ->assertJsonPath('data_publi.0', 'A data de publicação não pode ser anterior a hoje.');
+
+        $expirationResponse->assertStatus(422)
+            ->assertJsonPath('data_expiracao.0', 'A data de expiração não pode ser anterior a hoje.');
+    }
+
+    public function test_campaign_dispatch_targets_only_selected_blood_type(): void
+    {
+        Role::create(['id' => 1, 'name' => 'doador', 'guard_name' => 'api']);
+        $admin = $this->userWithRole('admin');
+
+        User::factory()->count(2)->create([
+            'role_id' => 1,
+            'status' => true,
+            'tipo_sang' => 'A+',
+        ]);
+
+        User::factory()->create([
+            'role_id' => 1,
+            'status' => true,
+            'tipo_sang' => 'O+',
+        ]);
+
+        $campanha = Campanha::create([
+            'titulo' => 'Campanha A+',
+            'descricao' => 'Precisamos de doadores A+.',
+            'tipo_sangue' => 'A+',
+            'data_publi' => now(),
+            'data_expiracao' => now()->addDay(),
+            'status' => true,
+            'criado_por' => $admin->id,
+        ]);
+
+        Sanctum::actingAs($admin);
+
+        $response = $this->postJson("/api/auth/campanhas/{$campanha->id}/disparar");
+
+        $response->assertOk()
+            ->assertJsonPath('total_elegiveis', 2)
+            ->assertJsonPath('total_disparado', 2);
+
+        $this->assertSame(2, $campanha->fresh()->total_disparado);
     }
 
     private function userWithRole(string|Role $role): User

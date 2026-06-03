@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\Doacao;
-use App\Models\Estoque;
 use App\Models\User;
 use App\Models\Triagem;
 use App\Models\Agendamento;
@@ -92,16 +91,6 @@ class DoacaoController extends Controller
             'data_validade_sangue' => $request->data_validade_sangue,
         ]);
 
-        $estoque = Estoque::firstOrNew([
-            'hemocentro_id' => $request->hemocentro_id,
-            'tipo_sangue' => $request->tipo_sangue,
-        ]);
-
-        $estoque->quantidade = ($estoque->quantidade ?? 0) + $request->quantidade;
-        $estoque->quantidade_minima = $estoque->quantidade_minima ?? 5000;
-        $estoque->atualizado_em = now();
-        $estoque->save();
-
         // Atualiza o status do agendamento para FIN (Finalizado)
         Agendamento::where('id', $request->agendamento_id)->update([
             'status_agendamento' => 'FIN'
@@ -117,7 +106,7 @@ class DoacaoController extends Controller
         }
 
         return response()->json([
-            'message' => 'Doação registrada com sucesso!',
+            'message' => 'Doação registrada com sucesso! Atualize o estoque para concluir o lançamento da bolsa.',
             'data'    => $doacao
         ], 201);
     }
@@ -132,6 +121,10 @@ class DoacaoController extends Controller
         }
 
         if ($user->role_id == 1 && $doacao->user_id != $user->id) {
+            return response()->json(['message' => 'Acesso negado.'], 403);
+        }
+
+        if ($user->hemocentro_id && (int) $doacao->hemocentro_id !== (int) $user->hemocentro_id) {
             return response()->json(['message' => 'Acesso negado.'], 403);
         }
 

@@ -2,9 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Doacao;
 use App\Models\Estoque;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class EstoqueController extends Controller
 {
@@ -42,26 +45,50 @@ class EstoqueController extends Controller
             'tipo_sangue' => 'required|in:A+,A-,B+,B-,AB+,AB-,O+,O-',
             'quantidade' => 'required|numeric',
             'quantidade_minima' => 'nullable|numeric|min:0',
+            'doacao_id' => 'nullable|exists:doacao,id',
         ]);
 
-        $estoque = Estoque::firstOrNew([
-            'hemocentro_id' => $validated['hemocentro_id'],
-            'tipo_sangue' => $validated['tipo_sangue'],
-        ]);
+        $doacao = null;
+        if (!empty($validated['doacao_id'])) {
+            $doacao = Doacao::findOrFail($validated['doacao_id']);
 
-        $novaQuantidade = ($estoque->quantidade ?? 0) + $validated['quantidade'];
+            if ((int) $doacao->hemocentro_id !== (int) $validated['hemocentro_id']) {
+                return response()->json(['message' => 'A doacao informada nao pertence a este hemocentro.'], 422);
+            }
 
-        if ($novaQuantidade < 0) {
-            return response()->json([
-                'message' => 'Quantidade insuficiente no estoque para essa baixa.',
-                'estoque_atual' => $estoque->quantidade ?? 0,
-            ], 422);
+            if ($doacao->estoque_lancado_em) {
+                return response()->json(['message' => 'Esta doacao ja foi lancada no estoque.'], 409);
+            }
         }
 
-        $estoque->quantidade = $novaQuantidade;
-        $estoque->quantidade_minima = $validated['quantidade_minima'] ?? $estoque->quantidade_minima ?? 5000;
-        $estoque->atualizado_em = now();
-        $estoque->save();
+        $estoque = DB::transaction(function () use ($validated, $doacao) {
+            $estoque = Estoque::firstOrNew([
+                'hemocentro_id' => $validated['hemocentro_id'],
+                'tipo_sangue' => $validated['tipo_sangue'],
+            ]);
+
+            $novaQuantidade = ($estoque->quantidade ?? 0) + $validated['quantidade'];
+
+            if ($novaQuantidade < 0) {
+                throw ValidationException::withMessages([
+                    'quantidade' => 'Quantidade insuficiente no estoque para essa baixa.',
+                ]);
+            }
+
+            $estoque->quantidade = $novaQuantidade;
+            $estoque->quantidade_minima = $validated['quantidade_minima'] ?? $estoque->quantidade_minima ?? 5000;
+            $estoque->atualizado_em = now();
+            $estoque->save();
+
+            if ($doacao) {
+                $doacao->update([
+                    'estoque_lancado_em' => now(),
+                    'estoque_lancado_por' => Auth::id(),
+                ]);
+            }
+
+            return $estoque;
+        });
 
         return response()->json([
             'message' => 'Estoque atualizado com sucesso!',

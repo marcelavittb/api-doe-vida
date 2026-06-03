@@ -15,7 +15,7 @@ O backend agora fornece indicadores reais e calculados para a tomada de decisão
 ### Identificação da Unidade:
 - O objeto `user` retornado no **Login** e no **/me** agora inclui o relacionamento `hemocentro` populado. Isso permite que o Diretor e o Funcionário vejam imediatamente o nome e os dados da unidade em que estão alocados.
 
----
+## 5. Segurança de Dados e Acesso de Staff
 
 ## 2. Fluxo de Elegibilidade (Autoexame)
 
@@ -67,3 +67,10 @@ GET /api/certificados/{id}/pdf      // Download do certificado oficial
 
 ---
 **Status:** Sincronizado com a demanda "Painel do Diretor" de 21/05/2026.
+A listagem de doadores (`GET /api/users`) foi restringida para atender às normas de segurança do hemocentro:
+- Funcionários e diretores têm acesso **exclusivo** a doadores que possuem histórico de doação na unidade vinculada ao funcionário logado.
+- A restrição é aplicada via `whereExists` na tabela `doacao`, garantindo que o escopo seja respeitado antes de qualquer filtro de busca dinâmica.
+- A resposta da API foi padronizada para incluir dados do doador, nome do hemocentro e a última doação registrada.
+
+---
+**Status:** O backend está 100% sincronizado com as necessidades de validação real de negócio solicitadas pelo front-end.

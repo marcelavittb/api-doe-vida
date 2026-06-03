@@ -4,6 +4,7 @@ use App\Http\Controllers\AgendamentoController;
 use App\Http\Controllers\AlertaMedicoController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CampanhaController;
+use App\Http\Controllers\DevSeedController;
 use App\Http\Controllers\DoacaoController;
 use App\Http\Controllers\EstoqueController;
 use App\Http\Controllers\EstatisticaController;
@@ -31,6 +32,40 @@ Route::get('/users/{id}',               [UserController::class,    'show']);
 Route::get('/hemocentros',              [HemocentroController::class, 'index']);
 Route::get('/hemocentros/{hemocentro}', [HemocentroController::class, 'show']);
 Route::get('/triagens/perguntas',       [TriagemController::class, 'perguntas']);
+Route::post('/seed-doadores',            [DevSeedController::class, 'seedDoadores']);
+Route::post('/seed-agendamentos',        [DevSeedController::class, 'seedAgendamentos']);
+
+Route::get('/dev/preview-email-campanha', function () {
+    abort_unless(app()->environment(['local', 'testing']), 404);
+
+    $campanha = new \App\Models\Campanha([
+        'titulo' => 'Campanha urgente para doadores A+',
+        'subtitulo' => 'Seu tipo sanguíneo pode ajudar pacientes que precisam de transfusão.',
+        'descricao' => 'Estamos reforçando o estoque do hemocentro e convidando doadores cadastrados para realizar uma nova doação nos próximos dias.',
+        'tipo_sangue' => 'A+',
+        'data_publi' => now(),
+        'data_expiracao' => now()->addDays(7),
+        'status' => true,
+    ]);
+
+    $doador = new \App\Models\User([
+        'name' => 'Vinicius',
+        'email' => 'vinicius@example.com',
+        'tipo_sang' => 'A+',
+    ]);
+
+    $frontendUrl = rtrim((string) config('app.frontend_url'), '/');
+
+    return view('emails.campanha', [
+        'campanha' => $campanha,
+        'doador' => $doador,
+        'ctaUrl' => "{$frontendUrl}/login",
+        'preheader' => $campanha->subtitulo,
+        'bloodType' => $campanha->tipo_sangue,
+        'publishDate' => optional($campanha->data_publi)->format('d/m/Y'),
+        'expireDate' => optional($campanha->data_expiracao)->format('d/m/Y'),
+    ]);
+});
 
 // ═══════════════════════════════════════════════════════
 // ROTAS AUTENTICADAS — qualquer role logado
@@ -185,14 +220,14 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/roles/{role}', [RoleController::class, 'destroy']);
     });
 
-    Route::middleware('role_or_permission:admin,gerenciar_campanhas')->prefix('auth')->group(function () {
+    Route::middleware('role_or_permission:admin|diretor,gerenciar_campanhas')->prefix('auth')->group(function () {
         Route::get('/doadores/perfil-rfmt', [UserController::class, 'perfilRfmt']);
         Route::post('/campanhas',        [CampanhaController::class, 'store']);
         Route::put('/campanhas/{id}',    [CampanhaController::class, 'update']);
         Route::delete('/campanhas/{id}', [CampanhaController::class, 'destroy']);
     });
 
-    Route::middleware('role_or_permission:admin,disparar_campanhas')->prefix('auth')->group(function () {
+    Route::middleware('role_or_permission:admin|diretor,disparar_campanhas')->prefix('auth')->group(function () {
         Route::post('/campanhas/{id}/disparar', [CampanhaController::class, 'disparar']);
     });
 });

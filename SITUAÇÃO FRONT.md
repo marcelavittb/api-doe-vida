@@ -77,8 +77,13 @@ Arquivo principal: `src/components/dashboards/DonorDashboard.tsx`.
 
 Arquivo principal: `src/components/dashboards/StaffDashboard.tsx`.
 
-### Agenda
+### Gestão de Doadores
 
+- Usa `GET /api/users`.
+- **Atenção**: Agora o backend filtra automaticamente doadores pelo histórico de doações no hemocentro do funcionário. O front não precisa aplicar filtros extras de hemocentro, mas deve estar preparado para receber apenas doadores aptos a serem vistos pelo funcionário logado.
+- Os resultados agora retornam o nome do hemocentro da última doação e a data da última doação, facilitando a exibição.
+
+### Agenda
 - Usa `GET /api/agendamentos`.
 - Pelo DOC-API, funcionário deve ver todos os agendamentos do seu hemocentro.
 - O front filtra pela data selecionada.

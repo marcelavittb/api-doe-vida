@@ -28,6 +28,8 @@ class Doacao extends Model
         'quantidade',
         'quantidade_retirada',
         'atualizado_em',
+        'estoque_lancado_em',
+        'estoque_lancado_por',
     ];
 
     public function agendamento()
@@ -58,5 +60,10 @@ class Doacao extends Model
     public function responsavelRetirada()
     {
         return $this->belongsTo(User::class, 'retirado_por');
+    }
+
+    public function responsavelEstoque()
+    {
+        return $this->belongsTo(User::class, 'estoque_lancado_por');
     }
 }
