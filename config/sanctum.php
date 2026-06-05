@@ -17,7 +17,7 @@ return [
 
     'stateful' => explode(',', env('SANCTUM_STATEFUL_DOMAINS', sprintf(
         '%s%s',
-        'localhost,localhost:3000,127.0.0.1,127.0.0.1:8000,::1,web-doe-vida-production.up.railway.app,web-doe-vida.up.railway.app',
+        'web-doe-vida-production.up.railway.app,api-doe-vida-uc75.onrender.com,localhost,localhost:3000,127.0.0.1,127.0.0.1:8000,::1,web-doe-vida.up.railway.app',
         Sanctum::currentApplicationUrlWithPort(),
         // Sanctum::currentRequestHost(),
     ))),

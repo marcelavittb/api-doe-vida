@@ -20,6 +20,7 @@ return [
     'allowed_methods' => ['*'],
 
     'allowed_origins' => [
+        'https://api-doe-vida-uc75.onrender.com',
         'https://web-doe-vida-production.up.railway.app',
         'https://web-doe-vida.up.railway.app',
         'http://localhost:3000',

@@ -207,7 +207,7 @@ O dashboard foi limpo de dados mockados e agora depende 100% da API para exibir 
 
 ## Observações técnicas
 
-- Base URL: `http://localhost:8000/api`.
+- Base URL: `https://api-doe-vida-uc75.onrender.com/api`.
 - O build pode falhar se `node_modules` estiver quebrado pelo pacote opcional do Rollup. Nesse caso, rodar:
 
 ```bash
