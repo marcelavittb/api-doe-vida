@@ -36,6 +36,9 @@ COPY . /var/www/html
 # Definir diretório de trabalho
 WORKDIR /var/www/html
 
+# Comando para instalar as dependencias
+RUN composer install --no-interaction --optimize-autoloader --no-dev
+
 # Ajustar permissões para as pastas de storage e cache
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
 
