@@ -377,17 +377,22 @@ class AuthController extends Controller
             'password' => 'required|string|min:6',
         ]);
 
-        if (!Auth::attempt($credentials)) {
+        // 1. Busca o usuário pelo e-mail
+        $user = User::where('email', $credentials['email'])->first();
+
+        // 2. Valida se o usuário existe e se a senha está correta usando Hash::check
+        if (!$user || !Hash::check($credentials['password'], $user->password)) {
             return response()->json([
                 'success' => false,
                 'message' => 'E-mail ou senha inválidos.'
             ], 401);
         }
 
+        // 3. Carrega o hemocentro, assim como você já estava fazendo
         /** @var \App\Models\User $user */
-        $user = Auth::user();
         $user->load('hemocentro');
 
+        // 4. Cria o token via Sanctum de forma totalmente stateless (sem sessão)
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
@@ -400,7 +405,6 @@ class AuthController extends Controller
             'token_type' => 'Bearer',
         ]);
     }
-
     /**
      * POST /api/auth/elegibilidade
      * Salva o resultado do autoexame de elegibilidade.
