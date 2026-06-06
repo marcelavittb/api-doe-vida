@@ -42,6 +42,9 @@ RUN composer install --no-interaction --optimize-autoloader --no-dev
 # Ajustar permissões para as pastas de storage e cache
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
 
+# Corrigir conflito de MPM do Apache
+RUN a2dismod mpm_event mpm_worker && a2enmod mpm_prefork
+
 # Expor a porta 80
 EXPOSE 80
 
