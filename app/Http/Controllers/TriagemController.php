@@ -89,7 +89,7 @@ class TriagemController extends Controller
             return response()->json([
                 'status' => 'sucesso',
                 'data' => $query->get(),
-            ], 200);
+            ], 200, [], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
         } catch (\Throwable $e) {
             Log::error('Erro ao buscar perguntas de triagem', [
                 'endpoint' => '/api/triagens/perguntas',
