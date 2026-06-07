@@ -13,6 +13,7 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 
 class TriagemController extends Controller
@@ -59,18 +60,52 @@ class TriagemController extends Controller
     // Deve ser declarada ANTES de /triagens/{id} no routes/api.php
     public function perguntas(Request $request)
     {
-        $bloco = $request->query('bloco');
+        $validator = Validator::make($request->query(), [
+            'bloco' => 'nullable|integer|in:0,1,3,4',
+        ]);
 
-        $query = TriagemPergunta::ativas()->with('opcoes')->orderBy('bloco')->orderBy('id');
-
-        if (!is_null($bloco)) {
-            $query->where('bloco', (int) $bloco);
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => 'erro',
+                'message' => 'O parametro bloco deve ser um dos valores: 0, 1, 3 ou 4.',
+                'errors' => $validator->errors(),
+            ], 422);
         }
 
-        return response()->json([
-            'status' => 'sucesso',
-            'data' => $query->get(),
-        ]);
+        try {
+            $this->garantirEstruturaPerguntasTriagem();
+            $this->garantirPerguntasPadrao();
+
+            $bloco = $request->integer('bloco');
+
+            $query = TriagemPergunta::query()
+                ->ativas()
+                ->with('opcoes')
+                ->orderBy('bloco')
+                ->orderBy('id');
+
+            if (!is_null($bloco)) {
+                $query->where('bloco', $bloco);
+            }
+
+            return response()->json([
+                'status' => 'sucesso',
+                'data' => $query->get(),
+            ], 200);
+        } catch (\Throwable $e) {
+            Log::error('Erro ao buscar perguntas de triagem', [
+                'endpoint' => '/api/triagens/perguntas',
+                'bloco' => $request->query('bloco'),
+                'exception' => class_basename($e),
+                'message' => $e->getMessage(),
+                'sql_state' => $e instanceof \PDOException ? $e->getCode() : null,
+            ]);
+
+            return response()->json([
+                'status' => 'erro',
+                'message' => 'Nao foi possivel carregar as perguntas da triagem no momento.',
+            ], 500);
+        }
     }
 
     // POST /api/auth/triagens
@@ -328,5 +363,35 @@ class TriagemController extends Controller
             'resultado_sorologico_alterado' => 'Resultado sorologico alterado',
             default => 'Outro motivo',
         };
+    }
+
+    private function garantirEstruturaPerguntasTriagem(): void
+    {
+        if (!Schema::hasTable('triagem_perguntas')) {
+            throw new \RuntimeException('Tabela triagem_perguntas nao encontrada.');
+        }
+
+        if (!Schema::hasTable('triagem_opcoes')) {
+            throw new \RuntimeException('Tabela triagem_opcoes nao encontrada.');
+        }
+
+        foreach (['id', 'pergunta', 'bloco', 'obrigatoria', 'status'] as $coluna) {
+            if (!Schema::hasColumn('triagem_perguntas', $coluna)) {
+                throw new \RuntimeException("Coluna obrigatoria ausente em triagem_perguntas: {$coluna}.");
+            }
+        }
+    }
+
+    private function garantirPerguntasPadrao(): void
+    {
+        if (TriagemPergunta::count() > 0) {
+            return;
+        }
+
+        Log::warning('Tabela triagem_perguntas vazia. Recriando perguntas padrao.', [
+            'endpoint' => '/api/triagens/perguntas',
+        ]);
+
+        app(\Database\Seeders\TriagemPerguntaSeeder::class)->run();
     }
 }

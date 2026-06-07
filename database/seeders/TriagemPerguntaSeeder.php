@@ -10,7 +10,40 @@ class TriagemPerguntaSeeder extends Seeder
 {
     public function run(): void
     {
-        $perguntas = [
+        foreach (self::perguntasPadrao() as $dados) {
+            $opcoes = $dados['opcoes'];
+            unset($dados['opcoes']);
+
+            $pergunta = TriagemPergunta::firstOrCreate(
+                ['pergunta' => $dados['pergunta'], 'bloco' => $dados['bloco']],
+                $dados
+            );
+
+            foreach ($opcoes as $opcao) {
+                TriagemOpcao::firstOrCreate(
+                    [
+                        'pergunta_id' => $pergunta->id,
+                        'texto_opcao' => $opcao['texto_opcao'],
+                    ],
+                    $opcao
+                );
+            }
+        }
+
+        if (!$this->command) {
+            return;
+        }
+
+        $this->command->info('Perguntas e opcoes de triagem criadas com sucesso!');
+        $this->command->info('Bloco 0 (pre-triagem): ' . TriagemPergunta::where('bloco', 0)->count() . ' perguntas');
+        $this->command->info('Bloco 1 (estado geral): ' . TriagemPergunta::where('bloco', 1)->count() . ' perguntas');
+        $this->command->info('Bloco 3 (historico recente): ' . TriagemPergunta::where('bloco', 3)->count() . ' perguntas');
+        $this->command->info('Bloco 4 (comportamental): ' . TriagemPergunta::where('bloco', 4)->count() . ' perguntas');
+    }
+
+    public static function perguntasPadrao(): array
+    {
+        return [
             [
                 'pergunta' => 'Você está se sentindo bem hoje, sem sintomas de gripe, febre ou mal-estar?',
                 'bloco' => 0,
@@ -216,31 +249,5 @@ class TriagemPerguntaSeeder extends Seeder
                 ],
             ],
         ];
-
-        foreach ($perguntas as $dados) {
-            $opcoes = $dados['opcoes'];
-            unset($dados['opcoes']);
-
-            $pergunta = TriagemPergunta::firstOrCreate(
-                ['pergunta' => $dados['pergunta'], 'bloco' => $dados['bloco']],
-                $dados
-            );
-
-            foreach ($opcoes as $opcao) {
-                TriagemOpcao::firstOrCreate(
-                    [
-                        'pergunta_id' => $pergunta->id,
-                        'texto_opcao' => $opcao['texto_opcao'],
-                    ],
-                    $opcao
-                );
-            }
-        }
-
-        $this->command->info('Perguntas e opções de triagem criadas com sucesso!');
-        $this->command->info('Bloco 0 (pré-triagem): ' . TriagemPergunta::where('bloco', 0)->count() . ' perguntas');
-        $this->command->info('Bloco 1 (estado geral): ' . TriagemPergunta::where('bloco', 1)->count() . ' perguntas');
-        $this->command->info('Bloco 3 (histórico recente): ' . TriagemPergunta::where('bloco', 3)->count() . ' perguntas');
-        $this->command->info('Bloco 4 (comportamental): ' . TriagemPergunta::where('bloco', 4)->count() . ' perguntas');
     }
 }
