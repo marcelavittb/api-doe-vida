@@ -7,6 +7,7 @@ use App\Models\Doacao;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -151,67 +152,77 @@ class CampanhaController extends Controller
     // POST /api/auth/campanhas/{id}/disparar
     public function disparar($id)
     {
-        $campanha = Campanha::findOrFail($id);
+        try {
+            $campanha = Campanha::findOrFail($id);
 
-        $query = User::where('role_id', 1)
-            ->where('status', 1)
-            ->whereNotNull('email');
+            $query = User::where('role_id', 1)
+                ->where('status', DB::raw('true'))
+                ->whereNotNull('email');
 
-        if ($campanha->tipo_sangue) {
-            $query->where('tipo_sang', $campanha->tipo_sangue);
-        }
-
-        if ($campanha->hemocentro_id) {
-            $query->whereHas('triagens', function ($q) use ($campanha) {
-                $q->where('hemocentro_id', $campanha->hemocentro_id);
-            });
-        }
-
-        $doadores = $query->get(['id', 'name', 'email', 'tipo_sang', 'tempo_restricao', 'criado_em']);
-
-        $doadoresSegmentados = $this->segmentarViaMl($doadores, $campanha);
-
-        $totalDisparado = 0;
-        foreach ($doadoresSegmentados as $doador) {
-            try {
-                Mail::send(
-                    ['html' => 'emails.campanha', 'text' => 'emails.campanha-text'],
-                    $this->campaignEmailData($campanha, $doador),
-                    function ($message) use ($doador, $campanha) {
-                        $message->to($doador->email)
-                            ->subject($campanha->titulo);
-                    }
-                );
-                $totalDisparado++;
-            } catch (\Throwable $e) {
-                Log::warning('FALHA AO ENVIAR EMAIL DA CAMPANHA', [
-                    'doador_id' => $doador->id,
-                    'campanha_id' => $campanha->id,
-                    'erro' => $e->getMessage(),
-                ]);
+            if ($campanha->tipo_sangue) {
+                $query->where('tipo_sang', $campanha->tipo_sangue);
             }
+
+            if ($campanha->hemocentro_id) {
+                $query->whereHas('triagens', function ($q) use ($campanha) {
+                    $q->where('hemocentro_id', $campanha->hemocentro_id);
+                });
+            }
+
+            $doadores = $query->get(['id', 'name', 'email', 'tipo_sang', 'tempo_restricao', 'criado_em']);
+
+            $doadoresSegmentados = $this->segmentarViaMl($doadores, $campanha);
+
+            $totalDisparado = 0;
+            foreach ($doadoresSegmentados as $doador) {
+                try {
+                    Mail::send(
+                        ['html' => 'emails.campanha', 'text' => 'emails.campanha-text'],
+                        $this->campaignEmailData($campanha, $doador),
+                        function ($message) use ($doador, $campanha) {
+                            $message->to($doador->email)
+                                ->subject($campanha->titulo);
+                        }
+                    );
+                    $totalDisparado++;
+                } catch (\Throwable $e) {
+                    Log::warning('FALHA AO ENVIAR EMAIL DA CAMPANHA', [
+                        'doador_id' => $doador->id,
+                        'campanha_id' => $campanha->id,
+                        'erro' => $e->getMessage(),
+                    ]);
+                }
+            }
+
+            $campanha->update(['total_disparado' => $totalDisparado]);
+
+            Log::info('CAMPANHA DISPARADA', [
+                'campanha_id' => $campanha->id,
+                'titulo' => $campanha->titulo,
+                'total_elegiveis' => $doadores->count(),
+                'total_segmentados' => $doadoresSegmentados->count(),
+                'total_disparado' => $totalDisparado,
+                'disparado_por' => Auth::id(),
+                'timestamp' => now(),
+            ]);
+
+            return response()->json([
+                'campanha_id' => $campanha->id,
+                'message' => "Campanha disparada para {$totalDisparado} doadores.",
+                'total_elegiveis' => $doadores->count(),
+                'total_segmentados' => $doadoresSegmentados->count(),
+                'total_disparado' => $totalDisparado,
+                'segmentacao' => $totalDisparado < $doadores->count() ? 'ml' : 'completa',
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'message' => 'Erro ao disparar campanha.',
+                'exception' => class_basename($e),
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ], 500);
         }
-
-        $campanha->update(['total_disparado' => $totalDisparado]);
-
-        Log::info('CAMPANHA DISPARADA', [
-            'campanha_id' => $campanha->id,
-            'titulo' => $campanha->titulo,
-            'total_elegiveis' => $doadores->count(),
-            'total_segmentados' => $doadoresSegmentados->count(),
-            'total_disparado' => $totalDisparado,
-            'disparado_por' => Auth::id(),
-            'timestamp' => now(),
-        ]);
-
-        return response()->json([
-            'campanha_id' => $campanha->id,
-            'message' => "Campanha disparada para {$totalDisparado} doadores.",
-            'total_elegiveis' => $doadores->count(),
-            'total_segmentados' => $doadoresSegmentados->count(),
-            'total_disparado' => $totalDisparado,
-            'segmentacao' => $totalDisparado < $doadores->count() ? 'ml' : 'completa',
-        ]);
     }
 
     private function segmentarViaMl($doadores, Campanha $campanha)
