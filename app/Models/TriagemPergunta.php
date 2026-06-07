@@ -41,7 +41,7 @@ class TriagemPergunta extends Model
 
     public function scopeAtivas($query)
     {
-        return $query->where('status', true);
+        return $query->whereRaw($query->getModel()->qualifyColumn('status') . ' = true');
     }
 
     public function scopeDoBloco($query, int $bloco)
