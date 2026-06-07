@@ -2,14 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use App\Jobs\SendCampaignEmailJob;
+use App\Jobs\ProcessCampaignDispatchJob;
 use App\Models\Campanha;
-use App\Models\Doacao;
-use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
@@ -156,50 +152,18 @@ class CampanhaController extends Controller
         try {
             $campanha = Campanha::findOrFail($id);
             $this->garantirEstruturaDisparoCampanha();
+            ProcessCampaignDispatchJob::dispatch($campanha->id, Auth::id());
 
-            $query = User::where('role_id', 1)
-                ->where('status', DB::raw('true'))
-                ->whereNotNull('email');
-
-            if ($campanha->tipo_sangue) {
-                $query->where('tipo_sang', $campanha->tipo_sangue);
-            }
-
-            if ($campanha->hemocentro_id) {
-                $query->whereHas('triagens', function ($q) use ($campanha) {
-                    $q->where('hemocentro_id', $campanha->hemocentro_id);
-                });
-            }
-
-            $doadores = $query->get(['id', 'name', 'email', 'tipo_sang', 'tempo_restricao', 'criado_em']);
-
-            $doadoresSegmentados = $this->segmentarViaMl($doadores, $campanha);
-
-            $totalEnfileirado = 0;
-            foreach ($doadoresSegmentados as $doador) {
-                SendCampaignEmailJob::dispatch($campanha->id, $doador->id);
-                $totalEnfileirado++;
-            }
-
-            $campanha->update(['total_disparado' => $totalEnfileirado]);
-
-            Log::info('CAMPANHA DISPARADA', [
+            Log::info('CAMPANHA ENFILEIRADA PARA PROCESSAMENTO', [
                 'campanha_id' => $campanha->id,
                 'titulo' => $campanha->titulo,
-                'total_elegiveis' => $doadores->count(),
-                'total_segmentados' => $doadoresSegmentados->count(),
-                'total_disparado' => $totalEnfileirado,
                 'disparado_por' => Auth::id(),
                 'timestamp' => now(),
             ]);
 
             return response()->json([
                 'campanha_id' => $campanha->id,
-                'message' => "Campanha enfileirada para {$totalEnfileirado} doadores.",
-                'total_elegiveis' => $doadores->count(),
-                'total_segmentados' => $doadoresSegmentados->count(),
-                'total_disparado' => $totalEnfileirado,
-                'segmentacao' => $totalEnfileirado < $doadores->count() ? 'ml' : 'completa',
+                'message' => 'Campanha enviada para processamento.',
                 'modo_envio' => 'queue',
             ]);
         } catch (\Throwable $e) {
@@ -213,89 +177,6 @@ class CampanhaController extends Controller
         }
     }
 
-    private function segmentarViaMl($doadores, Campanha $campanha)
-    {
-        $mlUrl = config('services.ml.url');
-        $mlKey = config('services.ml.key');
-
-        if (! $mlUrl) {
-            Log::info('ML nao configurado - disparando para todos os elegiveis', [
-                'campanha_id' => $campanha->id,
-            ]);
-
-            return $doadores;
-        }
-
-        try {
-            $doacaoStats = Doacao::query()
-                ->whereIn('user_id', $doadores->pluck('id'))
-                ->selectRaw('user_id, COUNT(*) as frequencia_doacoes, COALESCE(SUM(quantidade), 0) as volume_total_cc, MAX(data_hora_doacao) as ultima_doacao, MIN(data_hora_doacao) as primeira_doacao')
-                ->groupBy('user_id')
-                ->get()
-                ->keyBy('user_id');
-
-            $payload = [
-                'campanha_id' => $campanha->id,
-                'tipo_sangue' => $campanha->tipo_sangue,
-                'doadores'    => $doadores->map(function ($d) use ($doacaoStats) {
-                    $stats = $doacaoStats->get($d->id);
-                    $ultimaDoacao = $stats?->ultima_doacao ? \Carbon\Carbon::parse($stats->ultima_doacao) : null;
-                    $primeiraReferencia = $stats?->primeira_doacao ?: $d->criado_em;
-                    $primeiraDoacao = $primeiraReferencia ? \Carbon\Carbon::parse($primeiraReferencia) : now();
-                    $recenciaMeses = $ultimaDoacao ? $ultimaDoacao->diffInMonths(now()) : $primeiraDoacao->diffInMonths(now());
-                    $tempoMeses = max(1, $primeiraDoacao->diffInMonths(now()));
-                    $frequencia = (int) ($stats?->frequencia_doacoes ?? 0);
-                    $riscoInatividade = $recenciaMeses <= 6 ? 'Ativo' : ($recenciaMeses <= 12 ? 'Atencao' : ($recenciaMeses <= 24 ? 'Em_Risco' : 'Inativo'));
-
-                    return [
-                        'id'                          => $d->id,
-                        'tipo_sang'                   => $d->tipo_sang,
-                        'tempo_restricao'             => optional($d->tempo_restricao)->toDateString(),
-                        'cadastrado_em'               => optional($d->criado_em)->toDateTimeString(),
-                        'recencia_meses'              => $recenciaMeses,
-                        'frequencia_doacoes'          => $frequencia,
-                        'volume_total_cc'             => (float) ($stats?->volume_total_cc ?? 0),
-                        'tempo_desde_primeira_doacao' => $tempoMeses,
-                        'risco_inatividade'           => $riscoInatividade,
-                    ];
-                })->values()->all(),
-            ];
-
-            $request = Http::timeout(10)
-                ->withHeaders(['Authorization' => "Bearer {$mlKey}"])
-                ->when(app()->environment('local'), fn ($http) => $http->withoutVerifying());
-
-            $response = $request->post("{$mlUrl}/segmentar", $payload);
-
-            if ($response->successful()) {
-                $ids = $response->json('user_ids', []);
-                if (! empty($ids)) {
-                    $segmentados = $doadores->whereIn('id', $ids)->values();
-                    Log::info('ML SEGMENTOU DOADORES', [
-                        'campanha_id' => $campanha->id,
-                        'total_antes' => $doadores->count(),
-                        'total_depois' => $segmentados->count(),
-                    ]);
-
-                    return $segmentados;
-                }
-            }
-
-            Log::warning('ML retornou resposta invalida - usando fallback', [
-                'campanha_id' => $campanha->id,
-                'status' => $response->status(),
-            ]);
-
-        } catch (\Throwable $e) {
-            Log::warning('ML indisponivel - usando fallback local', [
-                'campanha_id' => $campanha->id,
-                'erro' => $e->getMessage(),
-            ]);
-        }
-
-        return $doadores->values();
-    }
-
     private function garantirEstruturaDisparoCampanha(): void
     {
         foreach (['campanhas', 'users', 'jobs'] as $tabela) {
@@ -303,21 +184,6 @@ class CampanhaController extends Controller
                 throw new \RuntimeException("Tabela obrigatoria ausente: {$tabela}.");
             }
         }
-    }
-
-    private function campaignEmailData(Campanha $campanha, User $doador): array
-    {
-        $frontendUrl = rtrim((string) config('app.frontend_url'), '/');
-
-        return [
-            'campanha' => $campanha,
-            'doador' => $doador,
-            'ctaUrl' => "{$frontendUrl}/login",
-            'preheader' => $campanha->subtitulo ?: 'Sua doaÃ§Ã£o pode ajudar a manter os estoques de sangue seguros.',
-            'bloodType' => $campanha->tipo_sangue ?: null,
-            'publishDate' => optional($campanha->data_publi)->format('d/m/Y'),
-            'expireDate' => optional($campanha->data_expiracao)->format('d/m/Y'),
-        ];
     }
 
     private function validateAndNormalizeCampaignDates(?string $dataPubli, ?string $dataExpiracao): array
