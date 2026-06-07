@@ -107,33 +107,46 @@ class CampanhaController extends Controller
         try {
             $campanha = Campanha::findOrFail($id);
 
+            Log::info('Atualizacao de campanha', [
+                'id' => $id,
+                'dados' => $request->all(),
+            ]);
+
             $validator = Validator::make($request->all(), [
                 'titulo' => 'sometimes|string|max:255',
                 'subtitulo' => 'nullable|string|max:255',
                 'descricao' => 'nullable|string|max:255',
                 'tipo_sangue' => 'nullable|in:A+,A-,B+,B-,AB+,AB-,O+,O-',
+                'hemocentro_id' => 'nullable|exists:hemocentros,id',
                 'data_publi' => 'sometimes|date',
                 'data_expiracao' => 'nullable|date',
                 'status' => 'sometimes|boolean',
             ]);
 
             if ($validator->fails()) {
-                return response()->json($validator->errors(), 422);
+                return response()->json([
+                    'success' => false,
+                    'errors' => $validator->errors(),
+                ], 422);
             }
 
             $payload = $request->only([
                 'titulo', 'subtitulo', 'descricao',
-                'tipo_sangue', 'data_publi', 'data_expiracao',
+                'tipo_sangue', 'hemocentro_id', 'data_publi', 'data_expiracao',
             ]);
 
             if ($request->has('data_publi') || $request->has('data_expiracao')) {
                 [$dataPubli, $dataExpiracao, $dateErrors] = $this->validateAndNormalizeCampaignDates(
                     $request->input('data_publi', $campanha->data_publi?->format('Y-m-d H:i:s')),
-                    $request->input('data_expiracao')
+                    $request->input('data_expiracao'),
+                    $campanha->data_publi?->format('Y-m-d H:i:s')
                 );
 
                 if ($dateErrors !== []) {
-                    return response()->json($dateErrors, 422);
+                    return response()->json([
+                        'success' => false,
+                        'errors' => $dateErrors,
+                    ], 422);
                 }
 
                 if ($request->has('data_publi')) {
@@ -239,7 +252,7 @@ class CampanhaController extends Controller
         }
     }
 
-    private function validateAndNormalizeCampaignDates(?string $dataPubli, ?string $dataExpiracao): array
+    private function validateAndNormalizeCampaignDates(?string $dataPubli, ?string $dataExpiracao, ?string $dataPubliAtual = null): array
     {
         $errors = [];
 
@@ -250,9 +263,18 @@ class CampanhaController extends Controller
 
         if ($dataPubliNormalizada) {
             $dataPubliDia = new \DateTimeImmutable(substr($dataPubliNormalizada, 0, 10));
+            $dataPubliAtualNormalizada = null;
 
-            if ($dataPubliDia < $hoje) {
-                $errors['data_publi'] = ['A data de publicaÃ§Ã£o nÃ£o pode ser anterior a hoje.'];
+            if ($dataPubliAtual) {
+                try {
+                    $dataPubliAtualNormalizada = (new \DateTimeImmutable($dataPubliAtual))->format('Y-m-d');
+                } catch (\Throwable) {
+                    $dataPubliAtualNormalizada = null;
+                }
+            }
+
+            if ($dataPubliDia < $hoje && $dataPubliDia->format('Y-m-d') !== $dataPubliAtualNormalizada) {
+                $errors['data_publi'] = ['A data de publicacao nao pode ser anterior a hoje.'];
             }
         }
 
@@ -260,7 +282,7 @@ class CampanhaController extends Controller
             $dataExpiracaoDia = new \DateTimeImmutable(substr($dataExpiracaoNormalizada, 0, 10));
 
             if ($dataExpiracaoDia < $hoje) {
-                $errors['data_expiracao'] = ['A data de expiraÃ§Ã£o nÃ£o pode ser anterior a hoje.'];
+                $errors['data_expiracao'] = ['A data de expiracao nao pode ser anterior a hoje.'];
             }
         }
 
@@ -269,7 +291,7 @@ class CampanhaController extends Controller
             $dataExpiracaoDia = new \DateTimeImmutable(substr($dataExpiracaoNormalizada, 0, 10));
 
             if ($dataExpiracaoDia <= $dataPubliDia && ! isset($errors['data_expiracao'])) {
-                $errors['data_expiracao'] = ['A data de expiraÃ§Ã£o deve ser em um dia posterior Ã  data de publicaÃ§Ã£o.'];
+                $errors['data_expiracao'] = ['A data de expiracao deve ser posterior a data de publicacao.'];
             }
         }
 
@@ -288,8 +310,20 @@ class CampanhaController extends Controller
             return null;
         }
 
+        $value = trim($value);
+
+        if (preg_match('/^\d{4}-\d{2}-\d{2}T/', $value)) {
+            try {
+                return (new \DateTimeImmutable($value))->format('Y-m-d H:i:s');
+            } catch (\Throwable) {
+                $errors[$field] = ['Data invalida. Use um formato de data valido.'];
+
+                return null;
+            }
+        }
+
         if (! preg_match('/^(\d{4,})-\d{2}-\d{2}(?:[ T]\d{2}:\d{2}(?::\d{2})?)?$/', $value, $matches)) {
-            $errors[$field] = ['Data invÃ¡lida. Use um formato de data vÃ¡lido.'];
+            $errors[$field] = ['Data invalida. Use um formato de data valido.'];
 
             return null;
         }
@@ -326,7 +360,7 @@ class CampanhaController extends Controller
             }
         }
 
-        $errors[$field] = ['Data invÃ¡lida. Use um formato de data vÃ¡lido.'];
+        $errors[$field] = ['Data invalida. Use um formato de data valido.'];
 
         return null;
     }
