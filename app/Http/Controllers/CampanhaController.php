@@ -6,6 +6,7 @@ use App\Jobs\ProcessCampaignDispatchJob;
 use App\Models\Campanha;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
@@ -36,83 +37,23 @@ class CampanhaController extends Controller
     // POST /api/auth/campanhas
     public function store(Request $request)
     {
-        $validator = Validator::make($request->all(), [
-            'titulo' => 'required|string|max:255',
-            'subtitulo' => 'nullable|string|max:255',
-            'descricao' => 'nullable|string',
-            'tipo_sangue' => 'nullable|in:A+,A-,B+,B-,AB+,AB-,O+,O-',
-            'hemocentro_id' => 'nullable|exists:hemocentros,id',
-            'data_publi' => 'required|date',
-            'data_expiracao' => 'nullable|date',
-        ]);
+        try {
+            $validator = Validator::make($request->all(), [
+                'titulo' => 'required|string|max:255',
+                'subtitulo' => 'nullable|string|max:255',
+                'descricao' => 'nullable|string|max:255',
+                'tipo_sangue' => 'nullable|in:A+,A-,B+,B-,AB+,AB-,O+,O-',
+                'hemocentro_id' => 'nullable|exists:hemocentros,id',
+                'data_publi' => 'required|date',
+                'data_expiracao' => 'nullable|date',
+            ]);
 
-        if ($validator->fails()) {
-            return response()->json($validator->errors(), 422);
-        }
+            if ($validator->fails()) {
+                return response()->json($validator->errors(), 422);
+            }
 
-        [$dataPubli, $dataExpiracao, $dateErrors] = $this->validateAndNormalizeCampaignDates(
-            $request->input('data_publi'),
-            $request->input('data_expiracao')
-        );
-
-        if ($dateErrors !== []) {
-            return response()->json($dateErrors, 422);
-        }
-
-        $campanha = Campanha::create([
-            'titulo' => $request->titulo,
-            'subtitulo' => $request->subtitulo,
-            'descricao' => $request->descricao,
-            'tipo_sangue' => $request->tipo_sangue,
-            'hemocentro_id' => $request->hemocentro_id,
-            'data_publi' => $dataPubli,
-            'data_expiracao' => $dataExpiracao,
-            'status' => true,
-            'criado_por' => Auth::id(),
-            'total_disparado' => 0,
-            'total_aberto' => 0,
-        ]);
-
-        Log::info('CAMPANHA CRIADA', [
-            'campanha_id' => $campanha->id,
-            'titulo' => $campanha->titulo,
-            'criado_por' => Auth::id(),
-            'timestamp' => now(),
-        ]);
-
-        return response()->json([
-            'message' => 'Campanha criada com sucesso!',
-            'data' => $campanha->load('hemocentro'),
-        ], 201);
-    }
-
-    // PUT /api/auth/campanhas/{id}
-    public function update(Request $request, $id)
-    {
-        $campanha = Campanha::findOrFail($id);
-
-        $validator = Validator::make($request->all(), [
-            'titulo' => 'sometimes|string|max:255',
-            'subtitulo' => 'nullable|string|max:255',
-            'descricao' => 'nullable|string',
-            'tipo_sangue' => 'nullable|in:A+,A-,B+,B-,AB+,AB-,O+,O-',
-            'data_publi' => 'sometimes|date',
-            'data_expiracao' => 'nullable|date',
-            'status' => 'sometimes|boolean',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json($validator->errors(), 422);
-        }
-
-        $payload = $request->only([
-            'titulo', 'subtitulo', 'descricao',
-            'tipo_sangue', 'data_publi', 'data_expiracao', 'status',
-        ]);
-
-        if ($request->has('data_publi') || $request->has('data_expiracao')) {
             [$dataPubli, $dataExpiracao, $dateErrors] = $this->validateAndNormalizeCampaignDates(
-                $request->input('data_publi', $campanha->data_publi?->format('Y-m-d H:i:s')),
+                $request->input('data_publi'),
                 $request->input('data_expiracao')
             );
 
@@ -120,30 +61,142 @@ class CampanhaController extends Controller
                 return response()->json($dateErrors, 422);
             }
 
-            if ($request->has('data_publi')) {
-                $payload['data_publi'] = $dataPubli;
+            $campanhaId = DB::table('campanhas')->insertGetId([
+                'titulo' => $request->titulo,
+                'subtitulo' => $request->subtitulo,
+                'descricao' => $request->descricao,
+                'tipo_sangue' => $request->tipo_sangue,
+                'hemocentro_id' => $request->hemocentro_id,
+                'data_publi' => $dataPubli,
+                'data_expiracao' => $dataExpiracao,
+                'status' => DB::raw('true'),
+                'criado_por' => Auth::id(),
+                'total_disparado' => 0,
+                'total_aberto' => 0,
+                'criado_em' => now(),
+                'atualizado_em' => now(),
+            ]);
+
+            $campanha = Campanha::with('hemocentro')->findOrFail($campanhaId);
+
+            Log::info('CAMPANHA CRIADA', [
+                'campanha_id' => $campanha->id,
+                'titulo' => $campanha->titulo,
+                'criado_por' => Auth::id(),
+                'timestamp' => now(),
+            ]);
+
+            return response()->json([
+                'message' => 'Campanha criada com sucesso!',
+                'data' => $campanha,
+            ], 201);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'message' => 'Erro ao criar campanha.',
+                'exception' => class_basename($e),
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ], 500);
+        }
+    }
+
+    // PUT /api/auth/campanhas/{id}
+    public function update(Request $request, $id)
+    {
+        try {
+            $campanha = Campanha::findOrFail($id);
+
+            $validator = Validator::make($request->all(), [
+                'titulo' => 'sometimes|string|max:255',
+                'subtitulo' => 'nullable|string|max:255',
+                'descricao' => 'nullable|string|max:255',
+                'tipo_sangue' => 'nullable|in:A+,A-,B+,B-,AB+,AB-,O+,O-',
+                'data_publi' => 'sometimes|date',
+                'data_expiracao' => 'nullable|date',
+                'status' => 'sometimes|boolean',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json($validator->errors(), 422);
             }
 
-            $payload['data_expiracao'] = $dataExpiracao;
+            $payload = $request->only([
+                'titulo', 'subtitulo', 'descricao',
+                'tipo_sangue', 'data_publi', 'data_expiracao',
+            ]);
+
+            if ($request->has('data_publi') || $request->has('data_expiracao')) {
+                [$dataPubli, $dataExpiracao, $dateErrors] = $this->validateAndNormalizeCampaignDates(
+                    $request->input('data_publi', $campanha->data_publi?->format('Y-m-d H:i:s')),
+                    $request->input('data_expiracao')
+                );
+
+                if ($dateErrors !== []) {
+                    return response()->json($dateErrors, 422);
+                }
+
+                if ($request->has('data_publi')) {
+                    $payload['data_publi'] = $dataPubli;
+                }
+
+                $payload['data_expiracao'] = $dataExpiracao;
+            }
+
+            $payload['atualizado_em'] = now();
+
+            DB::table('campanhas')
+                ->where('id', $campanha->id)
+                ->update($payload);
+
+            if ($request->has('status')) {
+                DB::table('campanhas')
+                    ->where('id', $campanha->id)
+                    ->update([
+                        'status' => DB::raw($request->boolean('status') ? 'true' : 'false'),
+                        'atualizado_em' => now(),
+                    ]);
+            }
+
+            return response()->json([
+                'message' => 'Campanha atualizada!',
+                'data' => $campanha->fresh('hemocentro'),
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'message' => 'Erro ao atualizar campanha.',
+                'exception' => class_basename($e),
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ], 500);
         }
-
-        $campanha->update($payload);
-
-        return response()->json([
-            'message' => 'Campanha atualizada!',
-            'data' => $campanha->fresh('hemocentro'),
-        ]);
     }
 
     // DELETE /api/auth/campanhas/{id}
     public function destroy($id)
     {
-        $campanha = Campanha::findOrFail($id);
-        $campanha->status = false;
-        $campanha->save();
-        $campanha->delete();
+        try {
+            $campanha = Campanha::findOrFail($id);
 
-        return response()->json(['message' => 'Campanha removida!']);
+            DB::table('campanhas')
+                ->where('id', $campanha->id)
+                ->update([
+                    'status' => DB::raw('false'),
+                    'deletado_em' => now(),
+                    'atualizado_em' => now(),
+                ]);
+
+            return response()->json(['message' => 'Campanha removida!']);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'message' => 'Erro ao remover campanha.',
+                'exception' => class_basename($e),
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ], 500);
+        }
     }
 
     // POST /api/auth/campanhas/{id}/disparar
