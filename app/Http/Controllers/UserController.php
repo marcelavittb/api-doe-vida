@@ -29,11 +29,11 @@ class UserController extends Controller
             ],
             'telefone' => 'nullable|string|max:20',
             'tipo_sang' => 'nullable|in:A+,A-,B+,B-,AB+,AB-,O+,O-',
-            'sexo' => 'nullable|in:M,F,Outro,Prefiro nao informar,Prefiro não informar',
+            'sexo' => 'nullable|in:M,F,Outro,Prefiro nao informar,Prefiro nÃ£o informar',
             'data_nasc' => 'nullable|date',
         ]);
 
-        if (!$this->validarCPF($validated['cpf'])) {
+        if (! $this->validarCPF($validated['cpf'])) {
             return response()->json(['error' => 'CPF invalido'], 422);
         }
 
@@ -41,11 +41,11 @@ class UserController extends Controller
             $validated['hemocentro_id'] = null;
         }
 
-        if (($validated['sexo'] ?? null) === 'Prefiro nao informar' || ($validated['sexo'] ?? null) === 'Prefiro não informar') {
+        if (($validated['sexo'] ?? null) === 'Prefiro nao informar' || ($validated['sexo'] ?? null) === 'Prefiro nÃ£o informar') {
             $validated['sexo'] = 'Outro';
         }
 
-        if (!empty($validated['data_nasc'])) {
+        if (! empty($validated['data_nasc'])) {
             $validated['data_nasc'] = $this->formatarData($validated['data_nasc']);
         }
 
@@ -77,9 +77,9 @@ class UserController extends Controller
         $query = User::query();
 
         $userRoleName = $user->getRoleNames()->first() ?? '';
-        $isStaff = in_array($userRoleName, ['funcionario', 'diretor'])
+        $isStaff = in_array($userRoleName, ['funcionario', 'diretor'], true)
                    || $user->hasAnyPermission(['ver_agendamentos', 'ver_doacoes', 'ver_triagens']);
-        $isDonor  = $userRoleName === 'doador';
+        $isDonor = $userRoleName === 'doador';
 
         if ($isStaff && $user->hemocentro_id) {
             $hemocentroId = $user->hemocentro_id;
@@ -95,12 +95,9 @@ class UserController extends Controller
                     });
                 });
         } elseif ($isDonor) {
-        // 1. Restrições de visibilidade (Escopo Base Obrigatório)
             $query->where('id', $user->id);
         }
-        // Admin e roles customizadas sem hemocentro_id: sem filtro adicional (vê tudo)
 
-        // 2. Filtros de busca dinâmica
         if ($request->filled('search') || $request->filled('name')) {
             $searchTerm = $request->input('search') ?: $request->input('name');
             $query->where('users.name', 'like', "%{$searchTerm}%");
@@ -111,7 +108,7 @@ class UserController extends Controller
             $cpfLimpo = preg_replace('/[^0-9]/', '', $cpf);
             $query->where(function ($q) use ($cpf, $cpfLimpo) {
                 $q->where('users.cpf', 'like', "%{$cpf}%")
-                  ->orWhereRaw("REPLACE(REPLACE(users.cpf, '.', ''), '-', '') LIKE ?", ["%{$cpfLimpo}%"]);
+                    ->orWhereRaw("REPLACE(REPLACE(users.cpf, '.', ''), '-', '') LIKE ?", ["%{$cpfLimpo}%"]);
             });
         }
 
@@ -131,7 +128,7 @@ class UserController extends Controller
         }
 
         if ($request->filled('cidade')) {
-            $query->where('users.cidade', 'like', "%" . $request->input('cidade') . "%");
+            $query->where('users.cidade', 'like', '%' . $request->input('cidade') . '%');
         }
 
         if ($request->filled('idade_min')) {
@@ -152,13 +149,11 @@ class UserController extends Controller
             });
         }
 
-        // 3. Adiciona dados para resposta
         $query->with(['doacoes' => function ($q) {
             $q->orderBy('data_hora_doacao', 'desc')->limit(1);
         }, 'doacoes.hemocentro']);
         $query->withMax('doacoes', 'data_hora_doacao');
 
-        // 4. Paginação
         $perPage = $request->input('per_page', 15);
         return $query->orderBy('name')->paginate($perPage);
     }
@@ -167,8 +162,8 @@ class UserController extends Controller
     {
         $user = $request->user();
         $roleName = $user->getRoleNames()->first() ?? '';
-        if ($roleName !== 'admin' && $user->role_id != 4 && !$user->hasPermissionTo('gerenciar_campanhas')) {
-            return response()->json(['message' => 'Não autorizado'], 403);
+        if ($roleName !== 'admin' && $user->role_id != 4 && ! $user->hasPermissionTo('gerenciar_campanhas')) {
+            return response()->json(['message' => 'Nao autorizado'], 403);
         }
 
         $hoje = now();
@@ -179,7 +174,7 @@ class UserController extends Controller
             ->withCount('doacoes as total_doacoes')
             ->with(['doacoes' => function ($q) {
                 $q->select('user_id', 'data_hora_doacao', 'quantidade')
-                  ->orderBy('data_hora_doacao', 'desc');
+                    ->orderBy('data_hora_doacao', 'desc');
             }])
             ->get(['id', 'name', 'email', 'tipo_sang', 'tempo_restricao', 'criado_em'])
             ->map(function ($doador) use ($hoje) {
@@ -193,7 +188,9 @@ class UserController extends Controller
                 $frequencia = (int) ($doador->total_doacoes ?? 0);
 
                 $volumeTotal = $doacoes->sum('quantidade');
-                if ($volumeTotal == 0) $volumeTotal = $frequencia * 450;
+                if ($volumeTotal == 0) {
+                    $volumeTotal = $frequencia * 450;
+                }
 
                 $primeiraDoacao = $doacoes->last();
                 $tempoPrimeiraMeses = $primeiraDoacao
@@ -201,9 +198,13 @@ class UserController extends Controller
                     : (int) $hoje->diffInMonths($doador->criado_em ?? $hoje);
 
                 $risco = 'Ativo';
-                if ($recenciaMeses > 18)     $risco = 'Inativo';
-                elseif ($recenciaMeses > 9)  $risco = 'Em_Risco';
-                elseif ($recenciaMeses > 3)  $risco = 'Atencao';
+                if ($recenciaMeses > 18) {
+                    $risco = 'Inativo';
+                } elseif ($recenciaMeses > 9) {
+                    $risco = 'Em_Risco';
+                } elseif ($recenciaMeses > 3) {
+                    $risco = 'Atencao';
+                }
 
                 return [
                     'id' => $doador->id,
@@ -232,68 +233,109 @@ class UserController extends Controller
 
     public function update(Request $request, int $id)
     {
-        $user = User::findOrFail($id);
-        $this->normalizarRoleRequest($request);
+        try {
+            $user = User::findOrFail($id);
+            $this->normalizarRoleRequest($request);
 
-        $validated = $request->validate([
-            'name' => 'sometimes|string|max:255',
-            'email' => 'sometimes|email|unique:users,email,' . $id,
-            'password' => 'sometimes|min:6',
-            'cpf' => 'sometimes|string|max:14|unique:users,cpf,' . $id,
-            'role' => ['sometimes', 'string', 'exists:roles,name'],
-            'hemocentro_id' => [
-                Rule::requiredIf(function () use ($request, $user) {
-                    $role = $request->role ?? $user->getRoleNames()->first();
-                    return in_array($role, ['funcionario', 'diretor'], true);
-                }),
-                'nullable',
-                'exists:hemocentros,id',
-            ],
-            'status' => 'sometimes|boolean',
-            'tipo_sang' => 'sometimes|in:A+,A-,B+,B-,AB+,AB-,O+,O-',
-            'sexo' => 'sometimes|in:M,F,Outro,Prefiro nao informar,Prefiro não informar',
-            'telefone' => 'sometimes|string|max:20',
-            'data_nasc' => 'sometimes|date',
-        ]);
+            \Log::info('Atualizacao de usuario', [
+                'id' => $id,
+                'dados' => $request->all(),
+                'auth_user_id' => $request->user()?->id,
+            ]);
 
-        if (isset($validated['cpf']) && !$this->validarCPF($validated['cpf'])) {
-            return response()->json(['error' => 'CPF invalido'], 422);
-        }
+            $validated = $request->validate([
+                'name' => 'sometimes|string|max:255',
+                'email' => 'sometimes|email|unique:users,email,' . $id,
+                'password' => 'sometimes|min:6',
+                'cpf' => 'sometimes|string|max:14|unique:users,cpf,' . $id,
+                'role' => ['sometimes', 'string', 'exists:roles,name'],
+                'hemocentro_id' => [
+                    Rule::requiredIf(function () use ($request, $user) {
+                        $role = $request->role ?? $user->getRoleNames()->first();
+                        return in_array($role, ['funcionario', 'diretor'], true);
+                    }),
+                    'nullable',
+                    'exists:hemocentros,id',
+                ],
+                'status' => 'sometimes|boolean',
+                'tipo_sang' => 'sometimes|in:A+,A-,B+,B-,AB+,AB-,O+,O-',
+                'sexo' => 'sometimes|in:M,F,Outro,Prefiro nao informar,Prefiro nÃ£o informar',
+                'telefone' => 'sometimes|string|max:20',
+                'data_nasc' => 'sometimes|date',
+            ]);
 
-        if (isset($validated['password'])) {
-            $validated['password'] = Hash::make($validated['password']);
-        }
-
-        if (!empty($validated['data_nasc'])) {
-            $validated['data_nasc'] = $this->formatarData($validated['data_nasc']);
-        }
-
-        if (($validated['sexo'] ?? null) === 'Prefiro nao informar' || ($validated['sexo'] ?? null) === 'Prefiro não informar') {
-            $validated['sexo'] = 'Outro';
-        }
-
-        $roleName = $validated['role'] ?? null;
-        unset($validated['role']);
-
-        if ($roleName) {
-            $role = $this->buscarRole($roleName);
-            $validated['role_id'] = $role->id;
-
-            if ($roleName === 'doador') {
-                $validated['hemocentro_id'] = null;
+            if (isset($validated['cpf']) && ! $this->validarCPF($validated['cpf'])) {
+                return response()->json(['error' => 'CPF invalido'], 422);
             }
+
+            if (isset($validated['password'])) {
+                $validated['password'] = Hash::make($validated['password']);
+            }
+
+            if (! empty($validated['data_nasc'])) {
+                $validated['data_nasc'] = $this->formatarData($validated['data_nasc']);
+            }
+
+            if (($validated['sexo'] ?? null) === 'Prefiro nao informar' || ($validated['sexo'] ?? null) === 'Prefiro nÃ£o informar') {
+                $validated['sexo'] = 'Outro';
+            }
+
+            $roleName = $validated['role'] ?? null;
+            unset($validated['role']);
+
+            if ($roleName) {
+                $role = $this->buscarRole($roleName);
+                $validated['role_id'] = $role->id;
+
+                if ($roleName === 'doador') {
+                    $validated['hemocentro_id'] = null;
+                }
+            }
+
+            $status = array_key_exists('status', $validated) ? (bool) $validated['status'] : null;
+            unset($validated['status']);
+            $validated['atualizado_em'] = now();
+
+            DB::table('users')
+                ->where('id', $user->id)
+                ->update($validated);
+
+            if ($status !== null) {
+                DB::table('users')
+                    ->where('id', $user->id)
+                    ->update([
+                        'status' => DB::raw($status ? 'true' : 'false'),
+                        'atualizado_em' => now(),
+                    ]);
+            }
+
+            if (isset($role)) {
+                $user->syncRoles([$role]);
+            }
+
+            return response()->json([
+                'message' => 'Usuario atualizado com sucesso!',
+                'data' => $user->fresh(),
+            ], 200);
+        } catch (\Throwable $e) {
+            \Log::error('Erro ao atualizar usuario', [
+                'id' => $id,
+                'dados' => $request->all(),
+                'auth_user_id' => $request->user()?->id,
+                'exception' => class_basename($e),
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+
+            return response()->json([
+                'message' => 'Erro ao atualizar usuario.',
+                'exception' => class_basename($e),
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ], 500);
         }
-
-        $user->update($validated);
-
-        if (isset($role)) {
-            $user->syncRoles([$role]);
-        }
-
-        return response()->json([
-            'message' => 'Usuario atualizado com sucesso!',
-            'data' => $user->fresh(),
-        ], 200);
     }
 
     public function destroy(int $id)
@@ -310,7 +352,7 @@ class UserController extends Controller
 
     private function normalizarRoleRequest(Request $request): void
     {
-        if ($request->filled('role_id') && !$request->filled('role')) {
+        if ($request->filled('role_id') && ! $request->filled('role')) {
             $role = Role::find($request->input('role_id'));
 
             if ($role) {
