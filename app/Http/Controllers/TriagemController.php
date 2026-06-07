@@ -96,12 +96,17 @@ class TriagemController extends Controller
                 'bloco' => $request->query('bloco'),
                 'exception' => class_basename($e),
                 'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
                 'sql_state' => $e instanceof \PDOException ? $e->getCode() : null,
             ]);
 
             return response()->json([
                 'status' => 'erro',
-                'message' => 'Nao foi possivel carregar as perguntas da triagem no momento.',
+                'exception' => class_basename($e),
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
             ], 500);
         }
     }
