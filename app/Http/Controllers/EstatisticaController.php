@@ -196,7 +196,7 @@ class EstatisticaController extends Controller
     private function totalDoadoresAtivos(int $hemocentroId): int
     {
         return User::where('role_id', $this->roleId('doador'))
-            ->where('status', true)
+            ->where('status', DB::raw('true'))
             ->whereHas('triagens', fn ($query) => $query->where('hemocentro_id', $hemocentroId))
             ->count();
     }

@@ -62,7 +62,7 @@ class UserController extends Controller
             'tipo_sang' => $validated['tipo_sang'] ?? null,
             'sexo' => $validated['sexo'] ?? null,
             'data_nasc' => $validated['data_nasc'] ?? null,
-            'status' => true,
+            'status' => DB::raw('true'),
             'criado_por' => $request->user()?->id,
         ]);
 
@@ -174,7 +174,7 @@ class UserController extends Controller
         $hoje = now();
 
         $doadores = User::where('role_id', 1)
-            ->where('status', 1)
+            ->where('status', DB::raw('true'))
             ->whereNotNull('email')
             ->withCount('doacoes as total_doacoes')
             ->with(['doacoes' => function ($q) {
