@@ -51,9 +51,10 @@ class ProcessCampaignDispatchJob implements ShouldQueue
         }
 
         if ($campanha->hemocentro_id) {
-            $query->whereHas('triagens', function ($triagemQuery) use ($campanha) {
-                $triagemQuery->where('hemocentro_id', $campanha->hemocentro_id);
-            });
+            Log::info('CAMPANHA COM HEMOCENTRO DEFINIDO - sem restringir elegiveis por triagem previa', [
+                'campanha_id' => $campanha->id,
+                'hemocentro_id' => $campanha->hemocentro_id,
+            ]);
         }
 
         $doadores = $query->get(['id', 'name', 'email', 'tipo_sang', 'tempo_restricao', 'criado_em']);
