@@ -250,8 +250,11 @@ class TriagemController extends Controller
             ]);
 
             return response()->json([
-                'message' => 'Erro ao registrar triagem. Tente novamente.',
-                'details' => app()->environment('local') ? $e->getMessage() : null,
+                'message' => 'Erro ao registrar triagem.',
+                'exception' => class_basename($e),
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
             ], 500);
         }
 
