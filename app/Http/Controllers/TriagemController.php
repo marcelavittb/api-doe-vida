@@ -44,7 +44,7 @@ class TriagemController extends Controller
             $query->where('status_triagem', $request->status);
         }
         if ($request->filled('apto')) {
-            $query->where('apto', $request->boolean('apto'));
+            $query->whereRaw('apto = ' . $this->booleanSqlLiteral($request->boolean('apto')));
         }
         if ($request->filled('data')) {
             $query->whereDate('data_triagem', $request->data);
@@ -191,7 +191,7 @@ class TriagemController extends Controller
                 'hemocentro_id' => $request->hemocentro_id,
                 'data_triagem' => $request->data_triagem,
                 'status_triagem' => 'C',
-                'apto' => $apto,
+                'apto' => $this->booleanSqlExpression($apto),
                 'motivo_inaptidao' => $apto ? null : $categoriaLabel,
                 'observacoes' => $request->observacoes,
             ]);
@@ -321,12 +321,18 @@ class TriagemController extends Controller
 
         DB::beginTransaction();
         try {
-            $triagem->update($request->only([
+            $dadosTriagem = $request->only([
                 'apto',
                 'motivo_inaptidao',
                 'observacoes',
                 'status_triagem',
-            ]));
+            ]);
+
+            if (array_key_exists('apto', $dadosTriagem)) {
+                $dadosTriagem['apto'] = $this->booleanSqlExpression(filter_var($dadosTriagem['apto'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false);
+            }
+
+            $triagem->update($dadosTriagem);
 
             if ($request->filled('aptidao')) {
                 TriagemAptidao::updateOrCreate(
@@ -426,5 +432,19 @@ class TriagemController extends Controller
                 throw new \RuntimeException("Coluna obrigatoria ausente em triagens: {$coluna}.");
             }
         }
+    }
+
+    private function booleanSqlExpression(bool $value): \Illuminate\Database\Query\Expression|bool
+    {
+        if (DB::getDriverName() === 'pgsql') {
+            return DB::raw($this->booleanSqlLiteral($value));
+        }
+
+        return $value;
+    }
+
+    private function booleanSqlLiteral(bool $value): string
+    {
+        return $value ? 'true' : 'false';
     }
 }
