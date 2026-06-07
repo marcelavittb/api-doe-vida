@@ -5,11 +5,9 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Models\Triagem;
 use App\Models\TriagemAptidao;
-use App\Models\TriagemOpcao;
 use App\Models\TriagemPergunta;
 use App\Models\TriagemResposta;
 use App\Models\TriagemSinaisVitais;
-use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -76,7 +74,7 @@ class TriagemController extends Controller
             $this->garantirEstruturaPerguntasTriagem();
             $this->garantirPerguntasPadrao();
 
-            $bloco = $request->integer('bloco');
+            $bloco = $request->query('bloco');
 
             $query = TriagemPergunta::query()
                 ->ativas()
@@ -85,7 +83,7 @@ class TriagemController extends Controller
                 ->orderBy('id');
 
             if (!is_null($bloco)) {
-                $query->where('bloco', $bloco);
+                $query->where('bloco', (int) $bloco);
             }
 
             return response()->json([
@@ -113,71 +111,74 @@ class TriagemController extends Controller
     // sinais vitais + respostas + calculo de aptidao automatico
     public function store(Request $request)
     {
-        $user = auth()->user();
-
-        if (!$request->has('hemocentro_id') && $user->hemocentro_id) {
-            $request->merge(['hemocentro_id' => $user->hemocentro_id]);
-        }
-
-        $validator = Validator::make($request->all(), [
-            'agendamento_id' => 'required|exists:agendamento,id',
-            'user_id' => 'required|exists:users,id',
-            'hemocentro_id' => 'required|exists:hemocentros,id',
-            'data_triagem' => 'required|date',
-            'observacoes' => 'nullable|string',
-
-            'sinais_vitais' => 'nullable|array',
-            'sinais_vitais.peso' => 'nullable|numeric|min:40|max:300',
-            'sinais_vitais.pressao_sistolica' => 'nullable|integer|min:60|max:250',
-            'sinais_vitais.pressao_diastolica' => 'nullable|integer|min:40|max:150',
-            'sinais_vitais.temperatura' => 'nullable|numeric|min:34|max:42',
-            'sinais_vitais.frequencia_cardiaca' => 'nullable|integer|min:40|max:200',
-            'sinais_vitais.hemoglobina' => 'nullable|numeric|min:5|max:25',
-            'sinais_vitais.hematocrito' => 'nullable|numeric|min:10|max:70',
-
-            'respostas' => 'nullable|array',
-            'respostas.*.pergunta_id' => 'required_with:respostas|exists:triagem_perguntas,id',
-            'respostas.*.opcao_id' => 'required_with:respostas|exists:triagem_opcoes,id',
-
-            'aptidao' => 'required|array',
-            'aptidao.resultado' => 'required|in:apto,inapto_temporario,inapto_definitivo',
-            'aptidao.categoria_inaptidao' => 'required_unless:aptidao.resultado,apto|nullable|in:sinais_vitais_fora_do_padrao,intervalo_minimo_nao_cumprido,medicamento_incompativel,cirurgia_recente,viagem_area_de_risco,comportamento_de_risco,condicao_clinica_na_triagem,resultado_sorologico_alterado,outro',
-            'aptidao.observacoes_internas' => 'nullable|string',
-            'aptidao.notificacao_doador' => 'nullable|string',
-            'aptidao.valido_ate' => 'required_if:aptidao.resultado,inapto_temporario|nullable|date|after:today',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json($validator->errors(), 422);
-        }
-
-        $existente = Triagem::where('agendamento_id', $request->agendamento_id)
-            ->where('status_triagem', '!=', 'E')
-            ->first();
-
-        if ($existente) {
-            return response()->json([
-                'message' => 'Triagem recuperada com sucesso (já existente).',
-                'apto' => (bool) $existente->apto,
-                'data' => $existente->load(['sinaisVitais', 'aptidao', 'respostas.opcao']),
-            ], 200);
-        }
-
-        $resultadoAptidao = $request->input('aptidao.resultado');
-        $apto = $resultadoAptidao === 'apto';
-
-        $notificacaoDoador = $request->input('aptidao.notificacao_doador');
-        if (!$notificacaoDoador && !$apto) {
-            $notificacaoDoador = $this->gerarNotificacaoPadrao($resultadoAptidao);
-        }
-
-        $categoriaLabel = null;
-        if (!$apto && $request->filled('aptidao.categoria_inaptidao')) {
-            $categoriaLabel = $this->categoriaLabel($request->input('aptidao.categoria_inaptidao'));
-        }
-
-        DB::beginTransaction();
         try {
+            $this->garantirEstruturaCadastroTriagem();
+
+            $user = auth()->user();
+
+            if (!$request->has('hemocentro_id') && $user->hemocentro_id) {
+                $request->merge(['hemocentro_id' => $user->hemocentro_id]);
+            }
+
+            $validator = Validator::make($request->all(), [
+                'agendamento_id' => 'required|exists:agendamento,id',
+                'user_id' => 'required|exists:users,id',
+                'hemocentro_id' => 'required|exists:hemocentros,id',
+                'data_triagem' => 'required|date',
+                'observacoes' => 'nullable|string',
+
+                'sinais_vitais' => 'nullable|array',
+                'sinais_vitais.peso' => 'nullable|numeric|min:40|max:300',
+                'sinais_vitais.pressao_sistolica' => 'nullable|integer|min:60|max:250',
+                'sinais_vitais.pressao_diastolica' => 'nullable|integer|min:40|max:150',
+                'sinais_vitais.temperatura' => 'nullable|numeric|min:34|max:42',
+                'sinais_vitais.frequencia_cardiaca' => 'nullable|integer|min:40|max:200',
+                'sinais_vitais.hemoglobina' => 'nullable|numeric|min:5|max:25',
+                'sinais_vitais.hematocrito' => 'nullable|numeric|min:10|max:70',
+
+                'respostas' => 'nullable|array',
+                'respostas.*.pergunta_id' => 'required_with:respostas|exists:triagem_perguntas,id',
+                'respostas.*.opcao_id' => 'required_with:respostas|exists:triagem_opcoes,id',
+
+                'aptidao' => 'required|array',
+                'aptidao.resultado' => 'required|in:apto,inapto_temporario,inapto_definitivo',
+                'aptidao.categoria_inaptidao' => 'required_unless:aptidao.resultado,apto|nullable|in:sinais_vitais_fora_do_padrao,intervalo_minimo_nao_cumprido,medicamento_incompativel,cirurgia_recente,viagem_area_de_risco,comportamento_de_risco,condicao_clinica_na_triagem,resultado_sorologico_alterado,outro',
+                'aptidao.observacoes_internas' => 'nullable|string',
+                'aptidao.notificacao_doador' => 'nullable|string',
+                'aptidao.valido_ate' => 'required_if:aptidao.resultado,inapto_temporario|nullable|date|after:today',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json($validator->errors(), 422);
+            }
+
+            $existente = Triagem::where('agendamento_id', $request->agendamento_id)
+                ->where('status_triagem', '!=', 'E')
+                ->first();
+
+            if ($existente) {
+                return response()->json([
+                    'message' => 'Triagem recuperada com sucesso (ja existente).',
+                    'apto' => (bool) $existente->apto,
+                    'data' => $existente->load(['sinaisVitais', 'aptidao', 'respostas.opcao']),
+                ], 200);
+            }
+
+            $resultadoAptidao = $request->input('aptidao.resultado');
+            $apto = $resultadoAptidao === 'apto';
+
+            $notificacaoDoador = $request->input('aptidao.notificacao_doador');
+            if (!$notificacaoDoador && !$apto) {
+                $notificacaoDoador = $this->gerarNotificacaoPadrao($resultadoAptidao);
+            }
+
+            $categoriaLabel = null;
+            if (!$apto && $request->filled('aptidao.categoria_inaptidao')) {
+                $categoriaLabel = $this->categoriaLabel($request->input('aptidao.categoria_inaptidao'));
+            }
+
+            DB::beginTransaction();
+
             $triagem = Triagem::create([
                 'agendamento_id' => $request->agendamento_id,
                 'user_id' => $request->user_id,
@@ -228,9 +229,18 @@ class TriagemController extends Controller
 
             DB::commit();
         } catch (\Throwable $e) {
-            DB::rollBack();
+            if (DB::transactionLevel() > 0) {
+                DB::rollBack();
+            }
+
             Log::error('ERRO AO REGISTRAR TRIAGEM', [
+                'endpoint' => '/api/auth/triagens',
+                'agendamento_id' => $request->input('agendamento_id'),
+                'user_id' => $request->input('user_id'),
+                'hemocentro_id' => $request->input('hemocentro_id'),
+                'exception' => class_basename($e),
                 'erro' => $e->getMessage(),
+                'sql_state' => $e instanceof \PDOException ? $e->getCode() : null,
                 'timestamp' => now(),
             ]);
 
@@ -393,5 +403,20 @@ class TriagemController extends Controller
         ]);
 
         app(\Database\Seeders\TriagemPerguntaSeeder::class)->run();
+    }
+
+    private function garantirEstruturaCadastroTriagem(): void
+    {
+        foreach (['triagens', 'triagem_respostas', 'triagem_sinais_vitais', 'triagem_aptidao', 'triagem_perguntas', 'triagem_opcoes', 'agendamento'] as $tabela) {
+            if (!Schema::hasTable($tabela)) {
+                throw new \RuntimeException("Tabela obrigatoria ausente: {$tabela}.");
+            }
+        }
+
+        foreach (['agendamento_id', 'user_id', 'funcionario_id', 'hemocentro_id', 'data_triagem', 'status_triagem', 'apto'] as $coluna) {
+            if (!Schema::hasColumn('triagens', $coluna)) {
+                throw new \RuntimeException("Coluna obrigatoria ausente em triagens: {$coluna}.");
+            }
+        }
     }
 }
