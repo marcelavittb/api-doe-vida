@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\SendCampaignEmailJob;
 use App\Models\Campanha;
 use App\Models\Doacao;
 use App\Models\User;
@@ -10,7 +11,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 
 class CampanhaController extends Controller
@@ -154,6 +155,7 @@ class CampanhaController extends Controller
     {
         try {
             $campanha = Campanha::findOrFail($id);
+            $this->garantirEstruturaDisparoCampanha();
 
             $query = User::where('role_id', 1)
                 ->where('status', DB::raw('true'))
@@ -173,46 +175,32 @@ class CampanhaController extends Controller
 
             $doadoresSegmentados = $this->segmentarViaMl($doadores, $campanha);
 
-            $totalDisparado = 0;
+            $totalEnfileirado = 0;
             foreach ($doadoresSegmentados as $doador) {
-                try {
-                    Mail::send(
-                        ['html' => 'emails.campanha', 'text' => 'emails.campanha-text'],
-                        $this->campaignEmailData($campanha, $doador),
-                        function ($message) use ($doador, $campanha) {
-                            $message->to($doador->email)
-                                ->subject($campanha->titulo);
-                        }
-                    );
-                    $totalDisparado++;
-                } catch (\Throwable $e) {
-                    Log::warning('FALHA AO ENVIAR EMAIL DA CAMPANHA', [
-                        'doador_id' => $doador->id,
-                        'campanha_id' => $campanha->id,
-                        'erro' => $e->getMessage(),
-                    ]);
-                }
+                SendCampaignEmailJob::dispatch($campanha->id, $doador->id);
+                $totalEnfileirado++;
             }
 
-            $campanha->update(['total_disparado' => $totalDisparado]);
+            $campanha->update(['total_disparado' => $totalEnfileirado]);
 
             Log::info('CAMPANHA DISPARADA', [
                 'campanha_id' => $campanha->id,
                 'titulo' => $campanha->titulo,
                 'total_elegiveis' => $doadores->count(),
                 'total_segmentados' => $doadoresSegmentados->count(),
-                'total_disparado' => $totalDisparado,
+                'total_disparado' => $totalEnfileirado,
                 'disparado_por' => Auth::id(),
                 'timestamp' => now(),
             ]);
 
             return response()->json([
                 'campanha_id' => $campanha->id,
-                'message' => "Campanha disparada para {$totalDisparado} doadores.",
+                'message' => "Campanha enfileirada para {$totalEnfileirado} doadores.",
                 'total_elegiveis' => $doadores->count(),
                 'total_segmentados' => $doadoresSegmentados->count(),
-                'total_disparado' => $totalDisparado,
-                'segmentacao' => $totalDisparado < $doadores->count() ? 'ml' : 'completa',
+                'total_disparado' => $totalEnfileirado,
+                'segmentacao' => $totalEnfileirado < $doadores->count() ? 'ml' : 'completa',
+                'modo_envio' => 'queue',
             ]);
         } catch (\Throwable $e) {
             return response()->json([
@@ -306,6 +294,15 @@ class CampanhaController extends Controller
         }
 
         return $doadores->values();
+    }
+
+    private function garantirEstruturaDisparoCampanha(): void
+    {
+        foreach (['campanhas', 'users', 'jobs'] as $tabela) {
+            if (!Schema::hasTable($tabela)) {
+                throw new \RuntimeException("Tabela obrigatoria ausente: {$tabela}.");
+            }
+        }
     }
 
     private function campaignEmailData(Campanha $campanha, User $doador): array
