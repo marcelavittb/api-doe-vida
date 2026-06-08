@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -72,6 +73,20 @@ class User extends Authenticatable implements MustVerifyEmail
             'apto_pelo_autoexame' => 'boolean',
             'autoexame_validade'  => 'datetime',
         ];
+    }
+
+    protected function status(): Attribute
+    {
+        return Attribute::make(
+            set: fn ($value) => $value === null ? null : filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false,
+        );
+    }
+
+    protected function lgpdAceite(): Attribute
+    {
+        return Attribute::make(
+            set: fn ($value) => $value === null ? null : filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false,
+        );
     }
 
     public function triagens()
