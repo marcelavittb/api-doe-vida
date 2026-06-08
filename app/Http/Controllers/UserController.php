@@ -62,7 +62,7 @@ class UserController extends Controller
             'tipo_sang' => $validated['tipo_sang'] ?? null,
             'sexo' => $validated['sexo'] ?? null,
             'data_nasc' => $validated['data_nasc'] ?? null,
-            'status' => DB::raw('true'),
+            'status' => true,
             'criado_por' => $request->user()?->id,
         ]);
 
@@ -87,8 +87,7 @@ class UserController extends Controller
             $hemocentroId = $user->hemocentro_id;
             $query->where('role_id', $donorRoleId)
                 ->where(function ($q) use ($hemocentroId) {
-                    $q->where('users.hemocentro_id', $hemocentroId)
-                        ->orWhereHas('triagens', function ($triagens) use ($hemocentroId) {
+                    $q->whereHas('triagens', function ($triagens) use ($hemocentroId) {
                         $triagens->where('hemocentro_id', $hemocentroId);
                     })->orWhereExists(function ($sub) use ($hemocentroId) {
                         $sub->select(DB::raw(1))
@@ -160,25 +159,7 @@ class UserController extends Controller
         $query->withMax('doacoes', 'data_hora_doacao');
 
         $perPage = $request->input('per_page', 15);
-        $users = $query->orderBy('name')->paginate($perPage);
-        $users->getCollection()->transform(function (User $donor) {
-            $latestDonation = $donor->doacoes->first();
-
-            $donor->setAttribute('ultima_doacao_em', $latestDonation?->data_hora_doacao);
-            $donor->setAttribute('hemocentro_nome', $latestDonation?->hemocentro?->nome);
-            $donor->setAttribute('hemocentro_cidade', $latestDonation?->hemocentro?->cidade);
-
-            return $donor;
-        });
-
-        return response()->json([
-            'data' => $users->items(),
-            'items' => $users->items(),
-            'total' => $users->total(),
-            'current_page' => $users->currentPage(),
-            'last_page' => $users->lastPage(),
-            'per_page' => $users->perPage(),
-        ]);
+        return $query->orderBy('name')->paginate($perPage);
     }
 
     public function perfilRfmt(Request $request)

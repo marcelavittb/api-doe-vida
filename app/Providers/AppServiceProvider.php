@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Database\PgBouncerPostgresConnection;
+use Illuminate\Database\Connection;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\ServiceProvider;
 use Symfony\Component\Mailer\Bridge\Brevo\Transport\BrevoTransportFactory;
@@ -14,7 +16,14 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // Usa uma conexao PostgreSQL customizada que converte bindings booleanos
+        // para os literais 'true'/'false'. Necessario por causa do pooler do
+        // Supabase (PgBouncer) com EMULATE_PREPARES, que serializa bool como 1/0
+        // e faz o PostgreSQL recusar colunas boolean. Resolve o problema na raiz,
+        // sem precisar de DB::raw em cada query/insert.
+        Connection::resolverFor('pgsql', function ($connection, $database, $prefix, $config) {
+            return new PgBouncerPostgresConnection($connection, $database, $prefix, $config);
+        });
     }
 
     /**
