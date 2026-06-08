@@ -59,21 +59,18 @@ class User extends Authenticatable implements MustVerifyEmail
 
     protected $guard_name = 'api';
     
-    protected function casts(): array
-    {
-        return [
-            'email_verified_at' => 'datetime',
-            'password'        => 'hashed',
-            'data_nasc'       => 'date',
-            'responsavel_data_nasc' => 'date',
-            'status'          => 'boolean',
-            'tempo_restricao' => 'date',
-            'lgpd_aceite'     => 'boolean',
-            'lgpd_aceite_em'  => 'datetime',
-            'apto_pelo_autoexame' => 'boolean',
-            'autoexame_validade'  => 'datetime',
-        ];
-    }
+    protected $casts = [
+        'email_verified_at' => 'datetime',
+        'password' => 'hashed',
+        'data_nasc' => 'date',
+        'responsavel_data_nasc' => 'date',
+        'status' => 'boolean',
+        'tempo_restricao' => 'date',
+        'lgpd_aceite' => 'boolean',
+        'lgpd_aceite_em' => 'datetime',
+        'apto_pelo_autoexame' => 'boolean',
+        'autoexame_validade' => 'datetime',
+    ];
 
     protected function status(): Attribute
     {

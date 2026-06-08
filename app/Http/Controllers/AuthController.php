@@ -137,8 +137,8 @@ class AuthController extends Controller
                 'uf'        => $validated['uf'] ?? null,
                 'role_id'   => $role->id,
                 'hemocentro_id' => null,
-                'status'    => true,
-                'lgpd_aceite' => true,
+                'status'    => DB::raw('true'),
+                'lgpd_aceite' => DB::raw('true'),
                 'lgpd_aceite_em' => now(),
                 'lgpd_ip' => $request->ip(),
 
