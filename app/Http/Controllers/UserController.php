@@ -77,13 +77,34 @@ class UserController extends Controller
             $user = $request->user();
             $query = User::query();
             $donorRoleId = $this->roleId('doador');
+            $staffRoleIds = array_values(array_filter([
+                $this->roleId('funcionario'),
+                $this->roleId('diretor'),
+            ]));
 
             $userRoleName = $user->getRoleNames()->first() ?? '';
             $isStaff = in_array($userRoleName, ['funcionario', 'diretor'], true)
                        || $user->hasAnyPermission(['ver_agendamentos', 'ver_doacoes', 'ver_triagens']);
             $isDonor = $userRoleName === 'doador';
+            $staffScopeRequested = $request->input('scope') === 'staff';
 
-            if ($isStaff && $user->hemocentro_id && $donorRoleId !== null) {
+            if ($staffScopeRequested) {
+                if ((!in_array($userRoleName, ['diretor', 'admin'], true)) && (int) $user->role_id !== 4) {
+                    return response()->json(['message' => 'Nao autorizado'], 403);
+                }
+
+                $hemocentroId = $request->input('hemocentro_id') ?: $user->hemocentro_id;
+
+                if ($hemocentroId) {
+                    $query->where('users.hemocentro_id', $hemocentroId);
+                }
+
+                if (!empty($staffRoleIds)) {
+                    $query->whereIn('role_id', $staffRoleIds);
+                }
+
+                $query->with('hemocentro');
+            } elseif ($isStaff && $user->hemocentro_id && $donorRoleId !== null) {
                 $hemocentroId = $user->hemocentro_id;
                 $query->where('role_id', $donorRoleId)
                     ->where(function ($q) use ($hemocentroId) {
