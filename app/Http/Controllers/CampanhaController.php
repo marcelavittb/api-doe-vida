@@ -218,19 +218,29 @@ class CampanhaController extends Controller
         try {
             $campanha = Campanha::findOrFail($id);
             $this->garantirEstruturaDisparoCampanha();
-            ProcessCampaignDispatchJob::dispatch($campanha->id, Auth::id());
 
-            Log::info('CAMPANHA ENFILEIRADA PARA PROCESSAMENTO', [
+            // Processa o disparo de forma sincrona (dispatchSync) para que os
+            // e-mails sejam enviados na hora e o total_disparado ja venha
+            // preenchido na resposta. Isso evita depender de um worker de fila
+            // separado (queue:work), que nao roda no ambiente atual.
+            ProcessCampaignDispatchJob::dispatchSync($campanha->id, Auth::id());
+
+            // Recarrega para obter o total_disparado atualizado pelo job.
+            $campanha->refresh();
+
+            Log::info('CAMPANHA PROCESSADA (SYNC)', [
                 'campanha_id' => $campanha->id,
                 'titulo' => $campanha->titulo,
+                'total_disparado' => $campanha->total_disparado,
                 'disparado_por' => Auth::id(),
                 'timestamp' => now(),
             ]);
 
             return response()->json([
                 'campanha_id' => $campanha->id,
-                'message' => 'Campanha enviada para processamento.',
-                'modo_envio' => 'queue',
+                'message' => 'Campanha disparada com sucesso.',
+                'total_disparado' => (int) $campanha->total_disparado,
+                'modo_envio' => 'sync',
             ]);
         } catch (\Throwable $e) {
             return response()->json([

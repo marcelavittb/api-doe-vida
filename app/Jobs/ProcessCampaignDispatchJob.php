@@ -62,7 +62,7 @@ class ProcessCampaignDispatchJob implements ShouldQueue
 
         $totalEnfileirado = 0;
         foreach ($doadoresSegmentados as $doador) {
-            SendCampaignEmailJob::dispatch($campanha->id, $doador->id);
+            SendCampaignEmailJob::dispatchSync($campanha->id, $doador->id);
             $totalEnfileirado++;
         }
 
