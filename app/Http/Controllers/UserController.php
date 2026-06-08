@@ -73,111 +73,130 @@ class UserController extends Controller
 
     public function index(Request $request)
     {
-        $user = $request->user();
-        $query = User::query();
-        $donorRoleId = $this->roleId('doador');
+        try {
+            $user = $request->user();
+            $query = User::query();
+            $donorRoleId = $this->roleId('doador');
 
-        $userRoleName = $user->getRoleNames()->first() ?? '';
-        $isStaff = in_array($userRoleName, ['funcionario', 'diretor'], true)
-                   || $user->hasAnyPermission(['ver_agendamentos', 'ver_doacoes', 'ver_triagens']);
-        $isDonor = $userRoleName === 'doador';
+            $userRoleName = $user->getRoleNames()->first() ?? '';
+            $isStaff = in_array($userRoleName, ['funcionario', 'diretor'], true)
+                       || $user->hasAnyPermission(['ver_agendamentos', 'ver_doacoes', 'ver_triagens']);
+            $isDonor = $userRoleName === 'doador';
 
-        if ($isStaff && $user->hemocentro_id && $donorRoleId !== null) {
-            $hemocentroId = $user->hemocentro_id;
-            $query->where('role_id', $donorRoleId)
-                ->where(function ($q) use ($hemocentroId) {
-                    $q->where('users.hemocentro_id', $hemocentroId)
-                        ->orWhereHas('triagens', function ($triagens) use ($hemocentroId) {
-                        $triagens->where('hemocentro_id', $hemocentroId);
-                    })->orWhereExists(function ($sub) use ($hemocentroId) {
-                        $sub->select(DB::raw(1))
-                            ->from('doacao')
-                            ->whereColumn('doacao.user_id', 'users.id')
-                            ->where('doacao.hemocentro_id', $hemocentroId);
+            if ($isStaff && $user->hemocentro_id && $donorRoleId !== null) {
+                $hemocentroId = $user->hemocentro_id;
+                $query->where('role_id', $donorRoleId)
+                    ->where(function ($q) use ($hemocentroId) {
+                        $q->where('users.hemocentro_id', $hemocentroId)
+                            ->orWhereHas('triagens', function ($triagens) use ($hemocentroId) {
+                                $triagens->where('hemocentro_id', $hemocentroId);
+                            })->orWhereExists(function ($sub) use ($hemocentroId) {
+                                $sub->select(DB::raw(1))
+                                    ->from('doacao')
+                                    ->whereColumn('doacao.user_id', 'users.id')
+                                    ->where('doacao.hemocentro_id', $hemocentroId);
+                            });
                     });
-                });
-        } elseif ($isDonor) {
-            $query->where('id', $user->id);
-        }
-
-        if ($request->filled('search') || $request->filled('name')) {
-            $searchTerm = $request->input('search') ?: $request->input('name');
-            $query->whereRaw('LOWER(users.name) LIKE ?', ['%' . mb_strtolower($searchTerm) . '%']);
-        }
-
-        if ($request->filled('cpf')) {
-            $cpf = $request->input('cpf');
-            $cpfLimpo = preg_replace('/[^0-9]/', '', $cpf);
-            $query->where(function ($q) use ($cpf, $cpfLimpo) {
-                $q->where('users.cpf', 'like', "%{$cpf}%")
-                    ->orWhereRaw("REPLACE(REPLACE(users.cpf, '.', ''), '-', '') LIKE ?", ["%{$cpfLimpo}%"]);
-            });
-        }
-
-        if ($request->filled('tipo_sang')) {
-            $query->where('users.tipo_sang', $request->input('tipo_sang'));
-        }
-
-        if ($request->filled('sexo')) {
-            $query->where('users.sexo', $request->input('sexo'));
-        }
-
-        if ($request->has('status') && $request->input('status') !== null && $request->input('status') !== '') {
-            $statusValue = filter_var($request->input('status'), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
-            if ($statusValue !== null) {
-                $query->where('users.status', $statusValue);
+            } elseif ($isDonor) {
+                $query->where('id', $user->id);
             }
-        }
 
-        if ($request->filled('cidade')) {
-            $query->whereRaw('LOWER(users.cidade) LIKE ?', ['%' . mb_strtolower($request->input('cidade')) . '%']);
-        }
+            if ($request->filled('search') || $request->filled('name')) {
+                $searchTerm = $request->input('search') ?: $request->input('name');
+                $query->whereRaw('LOWER(users.name) LIKE ?', ['%' . strtolower($searchTerm) . '%']);
+            }
 
-        if ($request->filled('idade_min')) {
-            $maxBirthDate = now()->subYears((int) $request->input('idade_min'))->toDateString();
-            $query->whereDate('users.data_nasc', '<=', $maxBirthDate);
-        }
-        if ($request->filled('idade_max')) {
-            $minBirthDate = now()->subYears((int) $request->input('idade_max') + 1)->addDay()->toDateString();
-            $query->whereDate('users.data_nasc', '>=', $minBirthDate);
-        }
+            if ($request->filled('cpf')) {
+                $cpf = $request->input('cpf');
+                $cpfLimpo = preg_replace('/[^0-9]/', '', $cpf);
+                $query->where(function ($q) use ($cpf, $cpfLimpo) {
+                    $q->where('users.cpf', 'like', "%{$cpf}%")
+                        ->orWhereRaw("REPLACE(REPLACE(users.cpf, '.', ''), '-', '') LIKE ?", ["%{$cpfLimpo}%"]);
+                });
+            }
 
-        if ($request->filled('data_doacao_inicio') || $request->filled('data_doacao_fim')) {
-            $query->whereHas('doacoes', function ($sub) use ($request) {
-                if ($request->filled('data_doacao_inicio')) {
-                    $sub->where('data_hora_doacao', '>=', $request->input('data_doacao_inicio'));
+            if ($request->filled('tipo_sang')) {
+                $query->where('users.tipo_sang', $request->input('tipo_sang'));
+            }
+
+            if ($request->filled('sexo')) {
+                $query->where('users.sexo', $request->input('sexo'));
+            }
+
+            if ($request->has('status') && $request->input('status') !== null && $request->input('status') !== '') {
+                $statusValue = filter_var($request->input('status'), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+                if ($statusValue !== null) {
+                    $query->where('users.status', $statusValue);
                 }
-                if ($request->filled('data_doacao_fim')) {
-                    $sub->where('data_hora_doacao', '<=', $request->input('data_doacao_fim'));
-                }
+            }
+
+            if ($request->filled('cidade')) {
+                $query->whereRaw('LOWER(users.cidade) LIKE ?', ['%' . strtolower($request->input('cidade')) . '%']);
+            }
+
+            if ($request->filled('idade_min')) {
+                $maxBirthDate = now()->subYears((int) $request->input('idade_min'))->toDateString();
+                $query->whereDate('users.data_nasc', '<=', $maxBirthDate);
+            }
+            if ($request->filled('idade_max')) {
+                $minBirthDate = now()->subYears((int) $request->input('idade_max') + 1)->addDay()->toDateString();
+                $query->whereDate('users.data_nasc', '>=', $minBirthDate);
+            }
+
+            if ($request->filled('data_doacao_inicio') || $request->filled('data_doacao_fim')) {
+                $query->whereHas('doacoes', function ($sub) use ($request) {
+                    if ($request->filled('data_doacao_inicio')) {
+                        $sub->where('data_hora_doacao', '>=', $request->input('data_doacao_inicio'));
+                    }
+                    if ($request->filled('data_doacao_fim')) {
+                        $sub->where('data_hora_doacao', '<=', $request->input('data_doacao_fim'));
+                    }
+                });
+            }
+
+            $query->with(['doacoes' => function ($q) {
+                $q->orderBy('data_hora_doacao', 'desc')->limit(1);
+            }, 'doacoes.hemocentro']);
+            $query->withMax('doacoes', 'data_hora_doacao');
+
+            $perPage = $request->input('per_page', 15);
+            $users = $query->orderBy('name')->paginate($perPage);
+            $users->getCollection()->transform(function (User $donor) {
+                $latestDonation = $donor->doacoes->first();
+
+                $donor->setAttribute('ultima_doacao_em', $latestDonation?->data_hora_doacao);
+                $donor->setAttribute('hemocentro_nome', $latestDonation?->hemocentro?->nome);
+                $donor->setAttribute('hemocentro_cidade', $latestDonation?->hemocentro?->cidade);
+
+                return $donor;
             });
+
+            return response()->json([
+                'data' => $users->items(),
+                'items' => $users->items(),
+                'total' => $users->total(),
+                'current_page' => $users->currentPage(),
+                'last_page' => $users->lastPage(),
+                'per_page' => $users->perPage(),
+            ]);
+        } catch (\Throwable $e) {
+            \Log::error('Erro ao listar usuarios', [
+                'query' => $request->query(),
+                'auth_user_id' => $request->user()?->id,
+                'exception' => class_basename($e),
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+
+            return response()->json([
+                'message' => 'Erro ao listar usuarios.',
+                'exception' => class_basename($e),
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ], 500);
         }
-
-        $query->with(['doacoes' => function ($q) {
-            $q->orderBy('data_hora_doacao', 'desc')->limit(1);
-        }, 'doacoes.hemocentro']);
-        $query->withMax('doacoes', 'data_hora_doacao');
-
-        $perPage = $request->input('per_page', 15);
-        $users = $query->orderBy('name')->paginate($perPage);
-        $users->getCollection()->transform(function (User $donor) {
-            $latestDonation = $donor->doacoes->first();
-
-            $donor->setAttribute('ultima_doacao_em', $latestDonation?->data_hora_doacao);
-            $donor->setAttribute('hemocentro_nome', $latestDonation?->hemocentro?->nome);
-            $donor->setAttribute('hemocentro_cidade', $latestDonation?->hemocentro?->cidade);
-
-            return $donor;
-        });
-
-        return response()->json([
-            'data' => $users->items(),
-            'items' => $users->items(),
-            'total' => $users->total(),
-            'current_page' => $users->currentPage(),
-            'last_page' => $users->lastPage(),
-            'per_page' => $users->perPage(),
-        ]);
     }
 
     public function perfilRfmt(Request $request)
