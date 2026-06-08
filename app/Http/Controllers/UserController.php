@@ -75,15 +75,17 @@ class UserController extends Controller
     {
         $user = $request->user();
         $query = User::query();
+        $donorRoleId = $this->roleId('doador');
+        $likeOperator = $this->likeOperator();
 
         $userRoleName = $user->getRoleNames()->first() ?? '';
         $isStaff = in_array($userRoleName, ['funcionario', 'diretor'], true)
                    || $user->hasAnyPermission(['ver_agendamentos', 'ver_doacoes', 'ver_triagens']);
         $isDonor = $userRoleName === 'doador';
 
-        if ($isStaff && $user->hemocentro_id) {
+        if ($isStaff && $user->hemocentro_id && $donorRoleId !== null) {
             $hemocentroId = $user->hemocentro_id;
-            $query->where('role_id', 1)
+            $query->where('role_id', $donorRoleId)
                 ->where(function ($q) use ($hemocentroId) {
                     $q->whereHas('triagens', function ($triagens) use ($hemocentroId) {
                         $triagens->where('hemocentro_id', $hemocentroId);
@@ -100,15 +102,15 @@ class UserController extends Controller
 
         if ($request->filled('search') || $request->filled('name')) {
             $searchTerm = $request->input('search') ?: $request->input('name');
-            $query->where('users.name', 'like', "%{$searchTerm}%");
+            $query->where('users.name', $likeOperator, "%{$searchTerm}%");
         }
 
         if ($request->filled('cpf')) {
             $cpf = $request->input('cpf');
             $cpfLimpo = preg_replace('/[^0-9]/', '', $cpf);
-            $query->where(function ($q) use ($cpf, $cpfLimpo) {
-                $q->where('users.cpf', 'like', "%{$cpf}%")
-                    ->orWhereRaw("REPLACE(REPLACE(users.cpf, '.', ''), '-', '') LIKE ?", ["%{$cpfLimpo}%"]);
+            $query->where(function ($q) use ($cpf, $cpfLimpo, $likeOperator) {
+                $q->where('users.cpf', $likeOperator, "%{$cpf}%")
+                    ->orWhereRaw("REPLACE(REPLACE(users.cpf, '.', ''), '-', '') {$likeOperator} ?", ["%{$cpfLimpo}%"]);
             });
         }
 
@@ -128,14 +130,16 @@ class UserController extends Controller
         }
 
         if ($request->filled('cidade')) {
-            $query->where('users.cidade', 'like', '%' . $request->input('cidade') . '%');
+            $query->where('users.cidade', $likeOperator, '%' . $request->input('cidade') . '%');
         }
 
         if ($request->filled('idade_min')) {
-            $query->whereRaw('TIMESTAMPDIFF(YEAR, data_nasc, CURDATE()) >= ?', [$request->input('idade_min')]);
+            $maxBirthDate = now()->subYears((int) $request->input('idade_min'))->toDateString();
+            $query->whereDate('users.data_nasc', '<=', $maxBirthDate);
         }
         if ($request->filled('idade_max')) {
-            $query->whereRaw('TIMESTAMPDIFF(YEAR, data_nasc, CURDATE()) <= ?', [$request->input('idade_max')]);
+            $minBirthDate = now()->subYears((int) $request->input('idade_max') + 1)->addDay()->toDateString();
+            $query->whereDate('users.data_nasc', '>=', $minBirthDate);
         }
 
         if ($request->filled('data_doacao_inicio') || $request->filled('data_doacao_fim')) {
@@ -166,9 +170,17 @@ class UserController extends Controller
             return response()->json(['message' => 'Nao autorizado'], 403);
         }
 
+        $donorRoleId = $this->roleId('doador');
+        if ($donorRoleId === null) {
+            return response()->json([
+                'status' => 'erro',
+                'message' => 'Role de doador nao encontrada.',
+            ], 500);
+        }
+
         $hoje = now();
 
-        $doadores = User::where('role_id', 1)
+        $doadores = User::where('role_id', $donorRoleId)
             ->where('status', DB::raw('true'))
             ->whereNotNull('email')
             ->withCount('doacoes as total_doacoes')
@@ -377,6 +389,18 @@ class UserController extends Controller
         ])->firstOrFail();
     }
 
+    private function roleId(string $nome): ?int
+    {
+        return Role::where([
+            'name' => $nome,
+            'guard_name' => 'api',
+        ])->value('id');
+    }
+
+    private function likeOperator(): string
+    {
+        return DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
+    }
     private function formatarData(string $data): string
     {
         if (preg_match('/^\d{2}\/\d{2}\/\d{4}$/', $data)) {
