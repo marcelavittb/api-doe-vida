@@ -120,7 +120,7 @@ class AuthController extends Controller
                 'guard_name' => 'api',
             ]);
 
-            $user = User::create([
+            $userId = DB::table('users')->insertGetId([
                 'name'      => $validated['name'],
                 'email'     => $validated['email'],
                 'password'  => Hash::make($validated['password']),
@@ -141,6 +141,8 @@ class AuthController extends Controller
                 'lgpd_aceite' => DB::raw('true'),
                 'lgpd_aceite_em' => now(),
                 'lgpd_ip' => $request->ip(),
+                'criado_em' => now(),
+                'atualizado_em' => now(),
 
                 'responsavel_nome' => $validated['responsavel_nome'] ?? null,
                 'responsavel_cpf'  => $validated['responsavel_cpf'] ?? null,
@@ -149,6 +151,8 @@ class AuthController extends Controller
                     : null,
                 'responsavel_telefone' => $validated['responsavel_telefone'] ?? null,
             ]);
+
+            $user = User::findOrFail($userId);
 
             $user->assignRole($role);
 
