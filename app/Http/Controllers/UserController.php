@@ -62,7 +62,7 @@ class UserController extends Controller
             'tipo_sang' => $validated['tipo_sang'] ?? null,
             'sexo' => $validated['sexo'] ?? null,
             'data_nasc' => $validated['data_nasc'] ?? null,
-            'status' => DB::raw('true'),
+            'status' => $this->booleanSqlExpression(true),
             'criado_por' => $request->user()?->id,
         ]);
 
@@ -433,6 +433,16 @@ class UserController extends Controller
             'guard_name' => 'api',
         ])->value('id');
     }
+
+    private function booleanSqlExpression(bool $value): \Illuminate\Database\Query\Expression|bool
+    {
+        if (DB::getDriverName() === 'pgsql') {
+            return DB::raw($value ? 'true' : 'false');
+        }
+
+        return $value;
+    }
+
     private function formatarData(string $data): string
     {
         if (preg_match('/^\d{2}\/\d{2}\/\d{4}$/', $data)) {

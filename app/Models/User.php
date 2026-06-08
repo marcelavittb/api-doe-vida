@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Query\Expression;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
@@ -75,21 +76,27 @@ class User extends Authenticatable implements MustVerifyEmail
     protected function status(): Attribute
     {
         return Attribute::make(
-            set: fn ($value) => $value === null ? null : filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false,
+            set: fn ($value) => $value instanceof Expression
+                ? $value
+                : ($value === null ? null : filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false),
         );
     }
 
     protected function lgpdAceite(): Attribute
     {
         return Attribute::make(
-            set: fn ($value) => $value === null ? null : filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false,
+            set: fn ($value) => $value instanceof Expression
+                ? $value
+                : ($value === null ? null : filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false),
         );
     }
 
     protected function aptoPeloAutoexame(): Attribute
     {
         return Attribute::make(
-            set: fn ($value) => $value === null ? null : filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false,
+            set: fn ($value) => $value instanceof Expression
+                ? $value
+                : ($value === null ? null : filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false),
         );
     }
 
