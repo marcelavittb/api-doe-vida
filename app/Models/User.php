@@ -64,6 +64,7 @@ class User extends Authenticatable implements MustVerifyEmail
             'email_verified_at' => 'datetime',
             'password'        => 'hashed',
             'data_nasc'       => 'date',
+            'status'          => 'boolean',
             'tempo_restricao' => 'date',
             'lgpd_aceite'     => 'boolean',
             'lgpd_aceite_em'  => 'datetime',

@@ -62,7 +62,7 @@ class UserController extends Controller
             'tipo_sang' => $validated['tipo_sang'] ?? null,
             'sexo' => $validated['sexo'] ?? null,
             'data_nasc' => $validated['data_nasc'] ?? null,
-            'status' => DB::raw('true'),
+            'status' => true,
             'criado_por' => $request->user()?->id,
         ]);
 
