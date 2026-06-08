@@ -22,6 +22,7 @@ class TriagemController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
+        $perPage = max(1, min((int) $request->input('per_page', 15), 100));
         $query = Triagem::where('status_triagem', '!=', 'E')
             ->with([
                 'doador',
@@ -50,7 +51,17 @@ class TriagemController extends Controller
             $query->whereDate('data_triagem', $request->data);
         }
 
-        return response()->json($query->orderBy('data_triagem', 'desc')->get());
+        $triagens = $query->orderBy('data_triagem', 'desc')->paginate($perPage);
+
+        return response()->json([
+            'data' => $triagens->items(),
+            'meta' => [
+                'current_page' => $triagens->currentPage(),
+                'last_page' => $triagens->lastPage(),
+                'per_page' => $triagens->perPage(),
+                'total' => $triagens->total(),
+            ],
+        ]);
     }
 
     // GET /api/triagens/perguntas
