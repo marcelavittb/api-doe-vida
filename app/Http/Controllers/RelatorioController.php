@@ -625,7 +625,7 @@ class RelatorioController extends Controller
         $porHemocentroRaw = $porHemocentroRaw->get();
         $totalGeral = $porHemocentroRaw->sum('total') ?: 1;
 
-        $porHemocentro = $porHemocentroRaw->map(function ($row) use ($totalGeral) {
+        $porHemocentro = $porHemocentroRaw->map(function ($row) use ($totalGeral, $meses) {
             $hemo = Hemocentro::find($row->hemocentro_id);
             return [
                 'nome'      => $hemo?->nome ?? 'N/D',
