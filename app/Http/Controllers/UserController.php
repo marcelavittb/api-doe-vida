@@ -412,21 +412,8 @@ class UserController extends Controller
     {
         try {
             $user = User::findOrFail($id);
-
-            // Inativa o usuario atualizando o status direto via Query Builder,
-            // usando o literal SQL correto para boolean no PostgreSQL. Evita
-            // passar o booleano pelo Eloquent/mutator, que sob o pooler do
-            // Supabase (EMULATE_PREPARES) serializa false como 0 e faz o
-            // PostgreSQL recusar ("column status is of type boolean but
-            // expression is of type integer").
-            DB::table('users')
-                ->where('id', $user->id)
-                ->update([
-                    'status' => $this->booleanSqlExpression(false),
-                    'atualizado_em' => now(),
-                ]);
-
-            // Soft delete (marca a coluna deletado_em com timestamp).
+            $user->status = false;
+            $user->save();
             $user->delete();
 
             return response()->json([
