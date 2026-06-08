@@ -62,7 +62,7 @@ class UserController extends Controller
             'tipo_sang' => $validated['tipo_sang'] ?? null,
             'sexo' => $validated['sexo'] ?? null,
             'data_nasc' => $validated['data_nasc'] ?? null,
-            'status' => true,
+            'status' => DB::raw('true'),
             'criado_por' => $request->user()?->id,
         ]);
 
@@ -75,16 +75,15 @@ class UserController extends Controller
     {
         $user = $request->user();
         $query = User::query();
-        $donorRoleId = $this->roleId('doador');
 
         $userRoleName = $user->getRoleNames()->first() ?? '';
         $isStaff = in_array($userRoleName, ['funcionario', 'diretor'], true)
                    || $user->hasAnyPermission(['ver_agendamentos', 'ver_doacoes', 'ver_triagens']);
         $isDonor = $userRoleName === 'doador';
 
-        if ($isStaff && $user->hemocentro_id && $donorRoleId !== null) {
+        if ($isStaff && $user->hemocentro_id) {
             $hemocentroId = $user->hemocentro_id;
-            $query->where('role_id', $donorRoleId)
+            $query->where('role_id', 1)
                 ->where(function ($q) use ($hemocentroId) {
                     $q->whereHas('triagens', function ($triagens) use ($hemocentroId) {
                         $triagens->where('hemocentro_id', $hemocentroId);
@@ -133,12 +132,10 @@ class UserController extends Controller
         }
 
         if ($request->filled('idade_min')) {
-            $maxBirthDate = now()->subYears((int) $request->input('idade_min'))->toDateString();
-            $query->whereDate('users.data_nasc', '<=', $maxBirthDate);
+            $query->whereRaw('TIMESTAMPDIFF(YEAR, data_nasc, CURDATE()) >= ?', [$request->input('idade_min')]);
         }
         if ($request->filled('idade_max')) {
-            $minBirthDate = now()->subYears((int) $request->input('idade_max') + 1)->addDay()->toDateString();
-            $query->whereDate('users.data_nasc', '>=', $minBirthDate);
+            $query->whereRaw('TIMESTAMPDIFF(YEAR, data_nasc, CURDATE()) <= ?', [$request->input('idade_max')]);
         }
 
         if ($request->filled('data_doacao_inicio') || $request->filled('data_doacao_fim')) {
@@ -169,17 +166,9 @@ class UserController extends Controller
             return response()->json(['message' => 'Nao autorizado'], 403);
         }
 
-        $donorRoleId = $this->roleId('doador');
-        if ($donorRoleId === null) {
-            return response()->json([
-                'status' => 'erro',
-                'message' => 'Role de doador nao encontrada.',
-            ], 500);
-        }
-
         $hoje = now();
 
-        $doadores = User::where('role_id', $donorRoleId)
+        $doadores = User::where('role_id', 1)
             ->where('status', DB::raw('true'))
             ->whereNotNull('email')
             ->withCount('doacoes as total_doacoes')
@@ -386,14 +375,6 @@ class UserController extends Controller
             'name' => $nome,
             'guard_name' => 'api',
         ])->firstOrFail();
-    }
-
-    private function roleId(string $nome): ?int
-    {
-        return Role::where([
-            'name' => $nome,
-            'guard_name' => 'api',
-        ])->value('id');
     }
 
     private function formatarData(string $data): string
