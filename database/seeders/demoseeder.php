@@ -324,8 +324,6 @@ class DemoSeeder extends Seeder
                         'tipo_sangue'         => $meta['tipo'],
                         'quantidade'          => $qtd,
                         'atualizado_em'       => $dataDoacao->toDateTimeString(),
-                        'created_at'          => $dataDoacao->toDateTimeString(),
-                        'updated_at'          => $dataDoacao->toDateTimeString(),
                         'estoque_lancado_em'  => $lancado ? $dataDoacao->copy()->addHours(rand(1,4))->toDateTimeString() : null,
                         'estoque_lancado_por' => $lancado ? $funcId : null,
                     ]);

@@ -236,8 +236,6 @@ class HemocentroDemoDonorSeeder extends Seeder
                 'tipo_sangue' => $bloodType,
                 'quantidade' => 450,
                 'atualizado_em' => $donatedAt->toDateTimeString(),
-                'created_at' => $donatedAt->toDateTimeString(),
-                'updated_at' => $donatedAt->toDateTimeString(),
                 'estoque_lancado_em' => $donatedAt->copy()->addHour()->toDateTimeString(),
                 'estoque_lancado_por' => $staffId,
             ]);
