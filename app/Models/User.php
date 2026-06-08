@@ -86,6 +86,13 @@ class User extends Authenticatable implements MustVerifyEmail
         );
     }
 
+    protected function aptoPeloAutoexame(): Attribute
+    {
+        return Attribute::make(
+            set: fn ($value) => $value === null ? null : filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false,
+        );
+    }
+
     public function triagens()
     {
         return $this->hasMany(Triagem::class, 'user_id');

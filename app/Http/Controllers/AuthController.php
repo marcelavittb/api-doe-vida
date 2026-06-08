@@ -161,10 +161,13 @@ class AuthController extends Controller
                 $resultadoGeral = $validated['respostas_pre_triagem'][0]['resultado_geral'] ?? null;
 
                 if ($resultadoGeral === 'apto') {
-                    $user->update([
-                        'apto_pelo_autoexame' => true,
-                        'autoexame_validade'  => now()->addDays(7),
-                    ]);
+                    DB::table('users')
+                        ->where('id', $user->id)
+                        ->update([
+                            'apto_pelo_autoexame' => DB::raw('true'),
+                            'autoexame_validade'  => now()->addDays(7),
+                            'atualizado_em' => now(),
+                        ]);
                 }
 
                 foreach ($validated['respostas_pre_triagem'] as $resposta) {
@@ -422,11 +425,18 @@ class AuthController extends Controller
         /** @var \App\Models\User $user */
         $user = $request->user();
 
-        $user->update([
-            'apto_pelo_autoexame' => $request->apto,
-            // Validade de 24 horas para o teste
-            'autoexame_validade'  => $request->apto ? now()->addDay() : null,
-        ]);
+        $apto = $request->boolean('apto');
+
+        DB::table('users')
+            ->where('id', $user->id)
+            ->update([
+                'apto_pelo_autoexame' => DB::raw($apto ? 'true' : 'false'),
+                // Validade de 24 horas para o teste
+                'autoexame_validade'  => $apto ? now()->addDay() : null,
+                'atualizado_em' => now(),
+            ]);
+
+        $user = $user->fresh();
 
         return response()->json([
             'status' => 'sucesso',

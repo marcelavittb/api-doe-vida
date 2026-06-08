@@ -221,7 +221,7 @@ class DemoSeeder extends Seeder
                 'lgpd_aceite'         => true,
                 'lgpd_aceite_em'      => Carbon::now()->subDays(rand(30,730))->toDateTimeString(),
                 'lgpd_ip'             => $this->ip(),
-                'apto_pelo_autoexame' => rand(0,1),
+                'apto_pelo_autoexame' => (bool) rand(0,1),
                 'autoexame_validade'  => rand(0,1) ? Carbon::now()->addHours(rand(1,20))->toDateTimeString() : null,
             ]);
             $u->assignRole($rDoador);
