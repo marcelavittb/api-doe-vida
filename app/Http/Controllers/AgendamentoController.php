@@ -18,6 +18,7 @@ class AgendamentoController extends Controller
     public function index(Request $request)
     {
         $user = Auth::user();
+        $perPage = max(1, min((int) $request->input('per_page', 15), 100));
         $query = Agendamento::with([
             'hemocentro:id,nome,cidade,uf',
             'doador:id,name,telefone,tipo_sang,tempo_restricao,sexo',
@@ -45,11 +46,17 @@ class AgendamentoController extends Controller
             $query->whereDate('data_hora_doacao', $request->data);
         }
 
-        $agendamentos = $query->orderBy('data_hora_doacao', 'desc')->get();
+        $agendamentos = $query->orderBy('data_hora_doacao', 'desc')->paginate($perPage);
 
         return response()->json([
             'status' => 'sucesso',
-            'data'   => $agendamentos
+            'data'   => $agendamentos->items(),
+            'meta' => [
+                'current_page' => $agendamentos->currentPage(),
+                'last_page' => $agendamentos->lastPage(),
+                'per_page' => $agendamentos->perPage(),
+                'total' => $agendamentos->total(),
+            ],
         ]);
     }
 
@@ -59,6 +66,7 @@ class AgendamentoController extends Controller
     public function historico()
     {
         $user = Auth::user();
+        $perPage = max(1, min((int) request()->input('per_page', 15), 100));
         $agendamentos = Agendamento::with([
             'hemocentro:id,nome,cidade,uf',
             'triagem:id,agendamento_id,apto,data_triagem',
@@ -67,11 +75,17 @@ class AgendamentoController extends Controller
             ->where('user_id', $user->id)
             ->withTrashed() // Inclui deletados se houver
             ->orderBy('data_hora_doacao', 'desc')
-            ->get();
+            ->paginate($perPage);
 
         return response()->json([
             'status' => 'sucesso',
-            'data'   => $agendamentos
+            'data'   => $agendamentos->items(),
+            'meta' => [
+                'current_page' => $agendamentos->currentPage(),
+                'last_page' => $agendamentos->lastPage(),
+                'per_page' => $agendamentos->perPage(),
+                'total' => $agendamentos->total(),
+            ],
         ]);
     }
 

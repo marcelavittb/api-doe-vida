@@ -15,6 +15,7 @@ class DoacaoController extends Controller
     public function index(Request $request)
     {
         $user = $request->user() ?: Auth::user();
+        $perPage = max(1, min((int) $request->input('per_page', 15), 100));
         $query = Doacao::with(['doador', 'funcionario', 'hemocentro', 'agendamento', 'triagem']);
 
         if ($user->role_id == 1) {
@@ -27,11 +28,17 @@ class DoacaoController extends Controller
             $query->whereDate('data_hora_doacao', $request->data);
         }
 
-        $doacoes = $query->orderBy('data_hora_doacao', 'desc')->get();
+        $doacoes = $query->orderBy('data_hora_doacao', 'desc')->paginate($perPage);
 
         return response()->json([
             'status' => 'sucesso',
-            'data'   => $doacoes
+            'data'   => $doacoes->items(),
+            'meta' => [
+                'current_page' => $doacoes->currentPage(),
+                'last_page' => $doacoes->lastPage(),
+                'per_page' => $doacoes->perPage(),
+                'total' => $doacoes->total(),
+            ],
         ]);
     }
 

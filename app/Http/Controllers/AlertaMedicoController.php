@@ -17,12 +17,14 @@ class AlertaMedicoController extends Controller
     public function index(Request $request)
     {
         $user = Auth::user();
+        $perPage = max(1, min((int) $request->input('per_page', 15), 100));
         $query = AlertaMedico::with(['doador', 'hemocentro', 'criadoPor'])
             ->orderBy('criado_em', 'desc');
 
         if ($user->role_id == 1) {
             $query->where('user_id', $user->id);
-            $alertas = $query->get()->map(fn($a) => [
+            $alertas = $query->paginate($perPage);
+            $items = collect($alertas->items())->map(fn($a) => [
                 'id' => $a->id,
                 'tipo_alerta' => $a->tipo_alerta,
                 'status' => $a->status,
@@ -30,7 +32,16 @@ class AlertaMedicoController extends Controller
                 'criado_em' => $a->criado_em,
             ]);
 
-            return response()->json(['status' => 'sucesso', 'data' => $alertas]);
+            return response()->json([
+                'status' => 'sucesso',
+                'data' => $items,
+                'meta' => [
+                    'current_page' => $alertas->currentPage(),
+                    'last_page' => $alertas->lastPage(),
+                    'per_page' => $alertas->perPage(),
+                    'total' => $alertas->total(),
+                ],
+            ]);
         }
 
         if ($user->hemocentro_id) {
@@ -46,7 +57,13 @@ class AlertaMedicoController extends Controller
 
         return response()->json([
             'status' => 'sucesso',
-            'data' => $query->get(),
+            'data' => ($alertas = $query->paginate($perPage))->items(),
+            'meta' => [
+                'current_page' => $alertas->currentPage(),
+                'last_page' => $alertas->lastPage(),
+                'per_page' => $alertas->perPage(),
+                'total' => $alertas->total(),
+            ],
         ]);
     }
 

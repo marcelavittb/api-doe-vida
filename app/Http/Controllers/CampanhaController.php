@@ -16,13 +16,20 @@ class CampanhaController extends Controller
     // GET /api/campanhas
     public function index(Request $request)
     {
+        $perPage = max(1, min((int) $request->input('per_page', 15), 100));
         $campanhas = Campanha::with('hemocentro')
             ->orderBy('criado_em', 'desc')
-            ->get();
+            ->paginate($perPage);
 
         return response()->json([
             'status' => 'sucesso',
-            'data' => $campanhas,
+            'data' => $campanhas->items(),
+            'meta' => [
+                'current_page' => $campanhas->currentPage(),
+                'last_page' => $campanhas->lastPage(),
+                'per_page' => $campanhas->perPage(),
+                'total' => $campanhas->total(),
+            ],
         ]);
     }
 
