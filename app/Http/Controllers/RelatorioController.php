@@ -80,7 +80,7 @@ class RelatorioController extends Controller
         }
         $triagemQuery->where('created_at', '>=', Carbon::now()->subDays($dias));
         $totalTriagens = (clone $triagemQuery)->count();
-        $totalAptos    = (clone $triagemQuery)->where('apto', true)->count();
+        $totalAptos    = (clone $triagemQuery)->where('apto', DB::raw('true'))->count();
         $taxaAptidao   = $totalTriagens > 0 ? round(($totalAptos / $totalTriagens) * 100, 1) : null;
 
         // Doações por tipo sanguíneo no período
@@ -277,7 +277,7 @@ class RelatorioController extends Controller
             $triagemBase->where('hemocentro_id', $hemocentroId);
         }
         $triagensTotal = (clone $triagemBase)->count();
-        $triagensAptas = (clone $triagemBase)->where('apto', true)->count();
+        $triagensAptas = (clone $triagemBase)->where('apto', DB::raw('true'))->count();
         $taxaAptidao   = round($triagensAptas / max(1, $triagensTotal) * 100, 1);
 
         $pdf = Pdf::loadView('relatorios.doacoes', [
