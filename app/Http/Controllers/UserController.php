@@ -76,7 +76,6 @@ class UserController extends Controller
         $user = $request->user();
         $query = User::query();
         $donorRoleId = $this->roleId('doador');
-        $likeOperator = $this->likeOperator();
 
         $userRoleName = $user->getRoleNames()->first() ?? '';
         $isStaff = in_array($userRoleName, ['funcionario', 'diretor'], true)
@@ -103,15 +102,15 @@ class UserController extends Controller
 
         if ($request->filled('search') || $request->filled('name')) {
             $searchTerm = $request->input('search') ?: $request->input('name');
-            $query->where('users.name', $likeOperator, "%{$searchTerm}%");
+            $query->whereRaw('LOWER(users.name) LIKE ?', ['%' . mb_strtolower($searchTerm) . '%']);
         }
 
         if ($request->filled('cpf')) {
             $cpf = $request->input('cpf');
             $cpfLimpo = preg_replace('/[^0-9]/', '', $cpf);
-            $query->where(function ($q) use ($cpf, $cpfLimpo, $likeOperator) {
-                $q->where('users.cpf', $likeOperator, "%{$cpf}%")
-                    ->orWhereRaw("REPLACE(REPLACE(users.cpf, '.', ''), '-', '') {$likeOperator} ?", ["%{$cpfLimpo}%"]);
+            $query->where(function ($q) use ($cpf, $cpfLimpo) {
+                $q->where('users.cpf', 'like', "%{$cpf}%")
+                    ->orWhereRaw("REPLACE(REPLACE(users.cpf, '.', ''), '-', '') LIKE ?", ["%{$cpfLimpo}%"]);
             });
         }
 
@@ -131,7 +130,7 @@ class UserController extends Controller
         }
 
         if ($request->filled('cidade')) {
-            $query->where('users.cidade', $likeOperator, '%' . $request->input('cidade') . '%');
+            $query->whereRaw('LOWER(users.cidade) LIKE ?', ['%' . mb_strtolower($request->input('cidade')) . '%']);
         }
 
         if ($request->filled('idade_min')) {
@@ -414,11 +413,6 @@ class UserController extends Controller
             'name' => $nome,
             'guard_name' => 'api',
         ])->value('id');
-    }
-
-    private function likeOperator(): string
-    {
-        return DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
     }
     private function formatarData(string $data): string
     {
