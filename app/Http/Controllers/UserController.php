@@ -410,14 +410,32 @@ class UserController extends Controller
 
     public function destroy(int $id)
     {
-        $user = User::findOrFail($id);
-        $user->status = false;
-        $user->save();
-        $user->delete();
+        try {
+            $user = User::findOrFail($id);
+            $user->status = false;
+            $user->save();
+            $user->delete();
 
-        return response()->json([
-            'message' => 'Usuario inativado e removido com sucesso',
-        ]);
+            return response()->json([
+                'message' => 'Usuario inativado e removido com sucesso',
+            ]);
+        } catch (\Throwable $e) {
+            \Log::error('Erro ao remover usuario', [
+                'id' => $id,
+                'exception' => class_basename($e),
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+
+            return response()->json([
+                'message' => 'Erro ao remover usuario.',
+                'exception' => class_basename($e),
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ], 500);
+        }
     }
 
     private function normalizarRoleRequest(Request $request): void
