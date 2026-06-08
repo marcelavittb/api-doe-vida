@@ -24,6 +24,7 @@ class DatabaseSeeder extends Seeder
             TriagemSeeder::class,
             DoacaoSeeder::class,
             EstoqueSeeder::class,
+            HemocentroDemoDonorSeeder::class,
         ]);
         
     }
